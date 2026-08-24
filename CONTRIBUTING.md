@@ -4,7 +4,7 @@ We welcome contributions to the Compart source-available runtime!
 
 ## Licensing & License Agreement
 
-By contributing to Compart, you agree that your contributions will be licensed under the [Elastic License 2.0 (ELv2)](LICENSE).
+By contributing to Compart, you agree that your contributions will be licensed under the [Apache License 2.0](LICENSE), and to the terms of the [CLA](CLA.md).
 
 ## Development Setup
 

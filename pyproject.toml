@@ -5,14 +5,14 @@ build-backend = "maturin"
 [project]
 name = "compart"
 version = "1.0.4"
-description = "Compart — the agent workspace for developers. Kernel-enforced isolation, zero configuration, Git-style workflows."
+description = "Compart — the audit layer for AI coding agents. Every agent action on the record, every change undoable in milliseconds."
 requires-python = ">=3.10"
-license = { text = "ELv2" }
-keywords = ["ai-agents", "developer-tools", "sandbox", "isolation", "runtime"]
+license = { text = "Apache-2.0" }
+keywords = ["ai-agents", "developer-tools", "provenance", "audit", "sandbox", "isolation"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",

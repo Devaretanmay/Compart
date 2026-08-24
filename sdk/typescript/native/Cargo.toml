@@ -3,7 +3,7 @@ name = "compart-native"
 version = "1.0.4"
 edition = "2021"
 description = "Node/TypeScript binding for the Compart kernel sandbox"
-license = "ELv2"
+license = "Apache-2.0"
 
 [lib]
 crate-type = ["cdylib"]

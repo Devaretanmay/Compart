@@ -43,7 +43,7 @@
     "agent",
     "compartment"
   ],
-  "license": "ELv2",
+  "license": "Apache-2.0",
   "author": "Compart Labs (Devaretanmay) <tanmaydevare@gmail.com>",
   "repository": {
     "type": "git",
