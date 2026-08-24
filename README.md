@@ -4,7 +4,7 @@
 
 ### Git blame for agents.
 
-**Compart records what your AI coding agents actually did, stamps every commit with proof of who wrote it, and hands you a 2ms undo button for when they go rogue.**
+**Compart records what your AI coding agents actually did, stamps every commit with proof of who wrote it, and hands you a undo button for when they go rogue.**
 
 [PyPI Package](https://pypi.org/project/compart/) | [Quickstart](docs/QUICKSTART.md) | [Trailer Spec](SPEC.md)
 
