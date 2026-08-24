@@ -26,6 +26,10 @@ from typing import Any, Dict, List, Optional
 
 _logger = logging.getLogger("compart.engine.execution")
 
+# Agent binaries recognized for Agent-Origin provenance classification
+# (mirrors cli._KNOWN_AGENTS; kept local to avoid a cli import cycle).
+_AGENT_BINARIES = frozenset({"claude", "codex", "opencode", "cursor", "aider"})
+
 
 class ExecutionKind:
     INTERACTIVE = "INTERACTIVE"
@@ -92,20 +96,32 @@ class Execution:
         self.emit("execution.applied", {"change_count": len(self.changes)})
 
     def git_trailers(self) -> str:
-        """Format Git trailers (RFC 5322 metadata) for this execution."""
-        security_status = "clean"
+        """Format Git trailers per the Agent Provenance Trailers spec (SPEC.md).
+
+        Emits Agent-* field names. Releases prior to 1.1 wrote legacy
+        Compart-* names; readers should accept both (see SPEC.md,
+        "Compatibility").
+        """
+        sandbox_status = "clean"
         blocked_count = sum(
             1 for ev in self.events
             if "blocked" in ev.get("name", "").lower() or "denied" in ev.get("name", "").lower()
         )
         if blocked_count > 0:
-            security_status = f"{blocked_count} blocked action(s)"
+            sandbox_status = "blocked"
+
+        origin = (
+            "agent"
+            if self.command and self.command[0] in _AGENT_BINARIES
+            else "agent-assisted"
+        )
 
         lines = [
-            f"Compart-Execution: {self.execution_id}",
-            f"Compart-Agent: {self.agent_name}",
-            f"Compart-Compartment: {self.compartment_id}",
-            f"Compart-Security: {security_status}",
+            f"Agent-Origin: {origin}",
+            f"Agent-Agent: {self.agent_name}",
+            f"Agent-Execution: {self.execution_id}",
+            f"Agent-Compartment: {self.compartment_id}",
+            f"Agent-Sandbox: {sandbox_status}",
         ]
         return "\n".join(lines)
 

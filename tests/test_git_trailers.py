@@ -23,7 +23,7 @@ from compart.engine.execution import Execution, ExecutionKind, ExecutionManager,
 
 
 def test_execution_git_trailers_format():
-    """Execution.git_trailers() produces valid RFC-5322 Git trailer blocks."""
+    """Execution.git_trailers() emits Agent Provenance Trailers (SPEC.md)."""
     ex = Execution(
         execution_id="exec_123456789",
         kind=ExecutionKind.INTERACTIVE,
@@ -31,14 +31,26 @@ def test_execution_git_trailers_format():
         compartment_id="coding",
     )
     trailers = ex.git_trailers()
-    assert "Compart-Execution: exec_123456789" in trailers
-    assert "Compart-Agent: claude" in trailers
-    assert "Compart-Compartment: coding" in trailers
-    assert "Compart-Security: clean" in trailers
+    assert "Agent-Origin: agent" in trailers
+    assert "Agent-Agent: claude" in trailers
+    assert "Agent-Execution: exec_123456789" in trailers
+    assert "Agent-Compartment: coding" in trailers
+    assert "Agent-Sandbox: clean" in trailers
+
+
+def test_execution_git_trailers_process_origin():
+    """Non-agent governed processes classify as agent-assisted."""
+    ex = Execution(
+        execution_id="exec_proc",
+        kind=ExecutionKind.PROCESS,
+        command=["pytest"],
+        compartment_id="tester",
+    )
+    assert "Agent-Origin: agent-assisted" in ex.git_trailers()
 
 
 def test_execution_git_trailers_with_security_violations():
-    """Blocked security events are surfaced in the Git trailer."""
+    """Blocked security events collapse to the Agent-Sandbox: blocked enum value."""
     ex = Execution(
         execution_id="exec_999",
         kind=ExecutionKind.INTERACTIVE,
@@ -48,7 +60,7 @@ def test_execution_git_trailers_with_security_violations():
     ex.emit("network.blocked", {"host": "malicious.com"})
     ex.emit("fs.denied", {"path": "/etc/passwd"})
     trailers = ex.git_trailers()
-    assert "Compart-Security: 2 blocked action(s)" in trailers
+    assert "Agent-Sandbox: blocked" in trailers
 
 
 def test_git_commit_execution_staging_and_trailers():
@@ -97,10 +109,10 @@ def test_git_commit_execution_staging_and_trailers():
         )
         log_text = log_res.stdout
         assert "Implement login feature" in log_text
-        assert "Compart-Execution: exec_auth_01" in log_text
-        assert "Compart-Agent: claude" in log_text
-        assert "Compart-Compartment: coding" in log_text
-        assert "Compart-Security: clean" in log_text
+        assert "Agent-Execution: exec_auth_01" in log_text
+        assert "Agent-Agent: claude" in log_text
+        assert "Agent-Compartment: coding" in log_text
+        assert "Agent-Sandbox: clean" in log_text
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -130,6 +142,6 @@ def test_diff_with_trailers_in_json(monkeypatch):
         data = json.loads(buf.getvalue())
         assert data["change_sets"] == 1
         assert "git_trailers" in data["executions"][0]
-        assert "Compart-Execution: " in data["executions"][0]["git_trailers"]
+        assert "Agent-Execution: " in data["executions"][0]["git_trailers"]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

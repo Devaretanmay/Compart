@@ -2,6 +2,26 @@
 
 All notable changes to Compart are documented here.
 
+## [Unreleased]
+
+### Changed
+- **Relicensed Apache-2.0.** The project moves from Elastic License 2.0 to the
+  Apache License 2.0. The Compart name and logo remain trademarks of Compart
+  Labs (see NOTICE). Contributors are covered by CLA.md.
+- **Agent Provenance Trailers (spec v0.1).** `compart commit` now emits the
+  open `Agent-*` trailer names defined in SPEC.md (`Agent-Origin`,
+  `Agent-Agent`, `Agent-Execution`, `Agent-Compartment`, `Agent-Sandbox`),
+  adding `Agent-Origin` classification and collapsing security detail to the
+  spec's `clean`/`blocked` enum so trailers stay grep-queryable. Releases
+  prior to 1.1 wrote legacy `Compart-*` names; readers should accept both.
+
+### Added
+- **SPEC.md.** Open specification for Agent Provenance Trailers — plain git,
+  neutral naming, CC0 license text, legacy compatibility mapping.
+- **CLA.md.** Contributor license agreement keeping future dual-licensing open.
+- **LAUNCH.md.** Launch-week post drafts and metrics thresholds (not shipped in
+  the package).
+
 ## [1.0.4] - 2026-08-19
 
 ### Added

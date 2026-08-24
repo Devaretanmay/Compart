@@ -185,12 +185,13 @@ Commits applied agent changes to Git, automatically embedding structured RFC-532
 compart commit -m "feat(auth): implement token verification"
 ```
 
-*Commit will contain metadata trailers:*
+*Commit will contain metadata trailers (per the [Agent Provenance Trailers spec](../SPEC.md)):*
 ```text
-Compart-Execution: exec_1787082469762
-Compart-Agent: claude
-Compart-Compartment: builder
-Compart-Security: clean
+Agent-Origin: agent
+Agent-Agent: claude
+Agent-Execution: exec_1787082469762
+Agent-Compartment: builder
+Agent-Sandbox: clean
 ```
 
 ---
