@@ -19,8 +19,6 @@ All notable changes to Compart are documented here.
 - **SPEC.md.** Open specification for Agent Provenance Trailers — plain git,
   neutral naming, CC0 license text, legacy compatibility mapping.
 - **CLA.md.** Contributor license agreement keeping future dual-licensing open.
-- **LAUNCH.md.** Launch-week post drafts and metrics thresholds (not shipped in
-  the package).
 
 ## [1.0.4] - 2026-08-19
 
