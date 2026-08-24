@@ -8,7 +8,7 @@ repository, you agree to the following:
 1. **Copyright license.** You grant Compart Labs (Tanmay Jayant Devare) a
    perpetual, worldwide, non-exclusive, royalty-free, irrevocable license to
    use, reproduce, modify, distribute, sublicense, and relicense your
-   contribution as part of Compart — including under proprietary or dual-license
+   contribution as part of Compart - including under proprietary or dual-license
    terms in future commercial offerings.
 
 2. **Patent license.** To the extent you hold patent claims covering your

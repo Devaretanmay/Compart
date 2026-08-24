@@ -1,4 +1,4 @@
-"""Tests for PtySupervisor (non-interactive capture path only — no real PTY in CI)."""
+"""Tests for PtySupervisor (non-interactive capture path only - no real PTY in CI)."""
 
 import os
 import sys

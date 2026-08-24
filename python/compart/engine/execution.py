@@ -1,7 +1,7 @@
 """Unified Execution domain primitive.
 
-Every workload Compart governs — interactive agents, workflows, scripts,
-MCP servers — is represented as an Execution.  The kernel does not care
+Every workload Compart governs - interactive agents, workflows, scripts,
+MCP servers - is represented as an Execution.  The kernel does not care
 which kind it is; the compartment policy is the same abstraction.
 
 Hierarchy

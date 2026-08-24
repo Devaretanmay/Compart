@@ -16,7 +16,7 @@ All notable changes to Compart are documented here.
   prior to 1.1 wrote legacy `Compart-*` names; readers should accept both.
 
 ### Added
-- **SPEC.md.** Open specification for Agent Provenance Trailers — plain git,
+- **SPEC.md.** Open specification for Agent Provenance Trailers - plain git,
   neutral naming, CC0 license text, legacy compatibility mapping.
 - **CLA.md.** Contributor license agreement keeping future dual-licensing open.
 

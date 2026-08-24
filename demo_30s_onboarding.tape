@@ -17,20 +17,20 @@ Enter
 Sleep 1s
 Show
 
-# ── 1. INIT: Create the Compart workspace (0:00–0:06) ────────────────────────
+# ── 1. INIT: Create the Compart workspace (0:00-0:06) ────────────────────────
 # Voiceover: "Compart starts exactly where Git does. I initialize it inside my project, and it creates a workspace for my agents."
 Sleep 500ms
 Type "compart init"
 Enter
 Sleep 3.5s
 
-# ── 2. CONFIGURE: Inspect Declared Compartments (0:06–0:13) ──────────────────
+# ── 2. CONFIGURE: Inspect Declared Compartments (0:06-0:13) ──────────────────
 # Voiceover: "I define the environments I want. Research can read but not modify. Builder can write. Tester can execute but can't reach the network."
 Type "compart inspect"
 Enter
 Sleep 4.5s
 
-# ── 3. BUILD: Add Workflow Steps & Show DAG (0:13–0:21) ──────────────────────
+# ── 3. BUILD: Add Workflow Steps & Show DAG (0:13-0:21) ──────────────────────
 # Voiceover: "Finally, I define how the work should flow. Each step runs in its own compartment."
 Type "compart -w stripe-webhook"
 Enter
@@ -46,7 +46,7 @@ Type "compart workflow show stripe-webhook"
 Enter
 Sleep 4.5s
 
-# ── 4. PUNCHLINE: The Agent Workspace Primitive (0:21–0:28) ──────────────────
+# ── 4. PUNCHLINE: The Agent Workspace Primitive (0:21-0:28) ──────────────────
 # Voiceover: "That's Compart. Initialize your workspace, define your compartments, and compose your agent workflow. Your agents come later."
 Type "/tmp/render_30s_punchline.sh"
 Enter

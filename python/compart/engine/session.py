@@ -267,7 +267,7 @@ class SessionManager:
 
         Uses the most recent checkpoint that carries a ``snapshot_manifest``
         (taken by the CLI before the session ran).  Returns False when the
-        session is unknown or no snapshot checkpoint exists — never a silent
+        session is unknown or no snapshot checkpoint exists - never a silent
         no-op.
         """
         session = self.get_session(session_id)

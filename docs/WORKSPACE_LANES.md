@@ -1,6 +1,6 @@
 # Compart Virtual Agent Lanes & Integration Architecture
 
-Compart introduces **Virtual Agent Lanes**—the developer workspace abstraction for AI agents.
+Compart introduces **Virtual Agent Lanes**-the developer workspace abstraction for AI agents.
 
 ```text
 COMPART WORKSPACE
@@ -96,6 +96,6 @@ compart session rollback sess_1723635840000
 
 **Semantics:**
 
-- `apply` / `undo` operate on the change-set ledger — they approve/reject an execution's changes without touching files.
-- `restore` / `session rollback` are content operations — they restore the worktree to a session's pre-execution snapshot (modified files revert, files created during the session are removed).
+- `apply` / `undo` operate on the change-set ledger - they approve/reject an execution's changes without touching files.
+- `restore` / `session rollback` are content operations - they restore the worktree to a session's pre-execution snapshot (modified files revert, files created during the session are removed).
 - `diff` is the review surface: execution ID, agent, compartment, status, and the per-file change list (`ADDED` / `MODIFIED` / `DELETED`).

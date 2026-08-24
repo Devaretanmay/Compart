@@ -1,4 +1,4 @@
-# Agent Provenance Trailers — Specification
+# Agent Provenance Trailers - Specification
 
 Version: 0.1 (draft)
 Status: open for comment
@@ -15,8 +15,8 @@ scope an incident to "everything that one run touched."
 This spec fixes that with something git already understands: commit trailers.
 
 No new tools are required to read these trailers. `git log`, GitHub, GitLab,
-and every code host render them today. Any tool — Compart, your CI, someone
-else's agent harness — can write them. That's the point.
+and every code host render them today. Any tool - Compart, your CI, someone
+else's agent harness - can write them. That's the point.
 
 ## Design rules
 
@@ -121,7 +121,7 @@ build an agent harness and start emitting these, open a PR against this file's
 
 ### Implementations
 
-- [Compart](https://github.com/Devaretanmay/Compart) — CLI + Python SDK, emits trailers automatically via `compart commit`
+- [Compart](https://github.com/Devaretanmay/Compart) - CLI + Python SDK, emits trailers automatically via `compart commit`
 
 ## License
 

@@ -1,4 +1,4 @@
-"""PTY Supervisor — transparent terminal bridge for interactive agent execution.
+"""PTY Supervisor - transparent terminal bridge for interactive agent execution.
 
 Creates a PTY master/slave pair, applies the compartment policy in the child
 process, then bridges stdin/stdout between the calling terminal and the child
@@ -70,7 +70,7 @@ class PtySupervisor:
     compartment_policy:
         Optional dict describing the compartment policy to apply in the child
         (e.g. ``{"permissions": ["fs_read", "fs_write"]}``.  When ``None``
-        no additional policy is applied — the OS-level Landlock/Seatbelt
+        no additional policy is applied - the OS-level Landlock/Seatbelt
         profile from the Rust core is still applied when available.
     extra_env:
         Additional environment variables to pass to the child process.

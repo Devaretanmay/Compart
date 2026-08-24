@@ -93,14 +93,14 @@ _ws="$(_find_workspace 2>/dev/null || true)"
 if [ -n "$_ws" ]; then
   if [ -n "${{COMPART_EXECUTION_ID:-}}" ]; then
     # Already inside a Compart execution (an agent launched another agent).
-    # Inherit the parent execution's kernel boundary — do not wrap again.
+    # Inherit the parent execution's kernel boundary - do not wrap again.
     exec "$_COMPART_REAL" "$@"
   fi
   # Delegate to the Compart exec shim, which applies the compartment policy
   # and records the execution as an AgentSession.
   exec python3 -m compart._exec_shim "{agent}" "$_ws" "$@"
 else
-  # Outside a workspace — run the real binary transparently.
+  # Outside a workspace - run the real binary transparently.
   exec "$_COMPART_REAL" "$@"
 fi
 """
@@ -138,7 +138,7 @@ agents:
   opencode:
     compartment: default
 
-# Declared workflow DAGs — run with `compart workflow run <name>`.
+# Declared workflow DAGs - run with `compart workflow run <name>`.
 # Each node executes as its own governed Execution in its own compartment;
 # depends_on determines when nodes may run.
 #
@@ -321,7 +321,7 @@ def _resolve_compartment(
 
     An explicit override always wins; otherwise the agent's configured default
     compartment applies; otherwise the workspace default.  Agent defaults are
-    convenience routing, never security identity — every execution carries its
+    convenience routing, never security identity - every execution carries its
     own resolved policy.
     """
     if override:
@@ -839,7 +839,7 @@ def _topo_sort(nodes: List[WorkflowNodeConfig]) -> List[WorkflowNodeConfig]:
             if dep in by_name:
                 visit(by_name[dep])
             else:
-                print(f"Warning: node '{n.name}' depends on unknown node '{dep}' — ignored.")
+                print(f"Warning: node '{n.name}' depends on unknown node '{dep}' - ignored.")
         visited[n.name] = 2
         order.append(n)
 
@@ -1000,7 +1000,7 @@ def _run_workflow_file(ws_root: str, workflow_file: str, compartment_id: str, ve
     sess_mgr.save_session(session)
 
     status_str = "[DONE]" if result.success else "[FAILED]"
-    print(f"\n{status_str} (exit {result.returncode}) — {len(result.diffs)} file change(s)")
+    print(f"\n{status_str} (exit {result.returncode}) - {len(result.diffs)} file change(s)")
     sys.exit(0 if result.success else result.returncode)
 
 
@@ -1274,9 +1274,9 @@ def cmd_diff(args):
         })
         return
 
-    print("\nCOMPART DIFF — changes associated with agent executions\n")
+    print("\nCOMPART DIFF - changes associated with agent executions\n")
     if not records:
-        print("  (no change sets recorded — run an agent under Compart first)")
+        print("  (no change sets recorded - run an agent under Compart first)")
         print()
         return
 
@@ -1367,7 +1367,7 @@ def _apply_execution(exec_mgr: ExecutionManager, ex: Execution, force: bool = Fa
             conflicts.append((other.execution_id, p))
 
     if conflicts and not force:
-        print(f"  # {ex.execution_id}: CONFLICT — changes overlap other un-applied executions:")
+        print(f"  # {ex.execution_id}: CONFLICT - changes overlap other un-applied executions:")
         for other_id, path in conflicts:
             print(f"      {path}  (also modified by {other_id})")
         print("      Use --force to apply anyway.")
@@ -1473,7 +1473,7 @@ def cmd_undo(args):
 
     for ex in targets:
         if ex.status != ExecutionStatus.APPLIED:
-            print(f"  # {ex.execution_id}: not applied — nothing to undo.")
+            print(f"  # {ex.execution_id}: not applied - nothing to undo.")
             sys.exit(1)
 
         snap_dir = ex.snapshot_dir
@@ -1482,7 +1482,7 @@ def cmd_undo(args):
             print(f"  # {ex.execution_id}: restored {restored} file(s) from pre-execution snapshot.")
         else:
             print(
-                f"  # {ex.execution_id}: no snapshot found — "
+                f"  # {ex.execution_id}: no snapshot found - "
                 "bookkeeping reversed but files NOT restored on disk."
             )
 
@@ -1530,7 +1530,7 @@ def main():
         sys.exit(_launch_agent(agent_name, ws_root, user_argv=user_argv))
 
     description = textwrap.dedent("""\
-        Compart — the agent workspace for developers
+        Compart: the audit layer for AI coding agents
 
         Workspace:
           compart init                     Initialize a Compart workspace

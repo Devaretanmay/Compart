@@ -63,7 +63,7 @@ python3 -m compart.ci.runner "pytest"
 
 | Metric | Traditional Docker / MicroVM CI | Compart Accelerated CI |
 | :--- | :--- | :--- |
-| **Stage Startup Boot Time** | ~5,000ms – 30,000ms | Depends on runner, Python, and repository size |
+| **Stage Startup Boot Time** | ~5,000ms-30,000ms | Depends on runner, Python, and repository size |
 | **Workspace Reset** | Container rebuild or external reset | BLAKE3 snapshot/restore; measure on your repository |
 | **Network Security** | Open Egress (High exfiltration risk) | TCP egress blocked where supported by the OS |
 | **Secret Theft Protection** | Vulnerable to malicious PR scripts | **Protected by deny-by-default rules** |

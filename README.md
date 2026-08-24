@@ -29,7 +29,7 @@ You gave an agent access to your repo. Then came the questions nobody can answer
 
 `git log` has no idea. `git blame` shrugs. Your security team keeps asking.
 
-Compart answers all three — locally, in milliseconds, with zero infrastructure.
+Compart answers all three - locally, in milliseconds, with zero infrastructure.
 
 ## How it works
 
@@ -47,7 +47,7 @@ compart commit -m "Add auth module"
 ```
 
 That last command is the point. Every `compart commit` lands in git with
-machine-readable provenance trailers — which agent ran, under which execution,
+machine-readable provenance trailers - which agent ran, under which execution,
 with what security verdict. Anyone can verify it later with plain git. No
 server, no dashboard, no vendor lock-in.
 
@@ -59,7 +59,7 @@ Agent-Compartment: builder
 Agent-Sandbox: clean
 ```
 
-Open standard, spec'd in [SPEC.md](SPEC.md). Other tools can write the same trailers — we'd like that.
+Open standard, spec'd in [SPEC.md](SPEC.md). Other tools can write the same trailers - we'd like that.
 
 ---
 
@@ -71,7 +71,7 @@ Open standard, spec'd in [SPEC.md](SPEC.md). Other tools can write the same trai
 │    Audit-grade git trail  │    BLAKE3 physical revert │    DAGs across any agents    │
 ├───────────────────────────┼───────────────────────────┼──────────────────────────────┤
 │ 4. Kernel Sandbox         │ 5. Credential Defense     │ 6. Token Compression         │
-│    Seatbelt / Landlock    │    Secrets stay sealed    │    Rust engines, 40–70% less │
+│    Seatbelt / Landlock    │    Secrets stay sealed    │    Rust engines, 40-70% less │
 └───────────────────────────┴───────────────────────────┴──────────────────────────────┘
 ```
 
@@ -88,8 +88,8 @@ untracked human work alone. Faster than you can switch windows. No cloud
 snapshots, no container rebuilds.
 
 ### 3. Multi-agent pipelines
-Chain specialized steps into dependency-aware DAGs — a research step with
-network access, a build step without, a test step read-only — then execute the
+Chain specialized steps into dependency-aware DAGs - a research step with
+network access, a build step without, a test step read-only - then execute the
 whole graph topologically. Failed upstream steps skip their dependents;
 independent branches keep running.
 
@@ -102,14 +102,14 @@ compart --run vuln-scan
 ```
 
 ### 4. Kernel-level sandbox
-Process isolation enforced by the OS itself — macOS Seatbelt, Linux Landlock.
+Process isolation enforced by the OS itself - macOS Seatbelt, Linux Landlock.
 Deny-by-default filesystem scoping, per-compartment network gating, and
 confinement inherited by every child process the agent spawns. Not a wrapper
 around `exec()`. Not vibes.
 
 ### 5. Credential defense
 `~/.ssh`, `~/.aws`, `~/.config/gcloud`, keychains, browser profiles, git
-credentials — denied at the kernel boundary before the agent ever starts. An
+credentials - denied at the kernel boundary before the agent ever starts. An
 optional local proxy injects API secrets into outbound calls without the raw
 keys ever entering the agent's context.
 
@@ -117,7 +117,7 @@ keys ever entering the agent's context.
 Four Rust engines crush terminal noise before it eats your context window:
 SmartCrusher (structured JSON), LogCompressor (stack traces over progress
 bars), DiffCompressor (multi-file diffs), TextCrusher (extractive summaries).
-40–70% token savings on typical agent output. Your API bill will notice.
+40-70% token savings on typical agent output. Your API bill will notice.
 
 ---
 
@@ -161,7 +161,7 @@ print(f"{result.status} in {result.elapsed_s}s")
 
 | | Compart | Docker | Cloud microVMs (E2B etc.) | Raw host process |
 | :--- | :---: | :---: | :---: | :---: |
-| Startup overhead | **< 1 ms** | 2,000–10,000 ms | 1,000–5,000 ms | 0 ms |
+| Startup overhead | **< 1 ms** | 2,000-10,000 ms | 1,000-5,000 ms | 0 ms |
 | Setup | **one command** | Dockerfiles, daemon | cloud account, billing | none |
 | Secrets blocked by default | **yes, kernel-enforced** | manual mounts | remote | lol no |
 | Physical undo | **2 ms** | recreate container | VM snapshot | `git reset --hard` (good luck) |
@@ -176,9 +176,9 @@ print(f"{result.status} in {result.elapsed_s}s")
 
 ## Contributing
 
-PRs welcome — read [CONTRIBUTING.md](CONTRIBUTING.md) and [CLA.md](CLA.md) first.
+PRs welcome - read [CONTRIBUTING.md](CONTRIBUTING.md) and [CLA.md](CLA.md) first.
 Found a sandbox escape? That's a [security report](SECURITY.md), not an issue.
 
 ## License
 
-Apache-2.0. Fork it, embed it, ship it — just don't use our name to sell your fork.
+Apache-2.0. Fork it, embed it, ship it - just don't use our name to sell your fork.
