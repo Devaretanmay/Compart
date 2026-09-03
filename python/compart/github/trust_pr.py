@@ -28,7 +28,7 @@ class TrustPRMetadata:
 
 def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
     """Format high-trust, developer-delighting Pull Request body."""
-    status_emoji = "✅" if meta.unintended_files_modified == 0 and meta.test_exit_code == 0 else "⚠️"
+    status_tag = "[VERIFIED]" if meta.unintended_files_modified == 0 and meta.test_exit_code == 0 else "[NEEDS REVIEW]"
     
     diff_block = ""
     if meta.unified_diff:
@@ -44,17 +44,17 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
     score_pct = meta.semantic_score * 100.0
 
     lines = [
-        f"## {status_emoji} Autonomous Maintenance: Upgrade `{meta.provider_name}` ({meta.from_version} → {meta.to_version})",
+        f"## {status_tag} Autonomous Maintenance: Upgrade `{meta.provider_name}` ({meta.from_version} -> {meta.to_version})",
         "",
         "### Upstream API Drift Summary",
         f"- **Provider**: **{meta.provider_name}**",
-        f"- **Migration**: `{meta.from_version}` → `{meta.to_version}`",
+        f"- **Migration**: `{meta.from_version}` -> `{meta.to_version}`",
         f"- **Official Documentation**: [Vendor Changelog & Migration Guide]({meta.changelog_url})",
         f"- **Semantic Confidence**: `{score_pct:.1f}%`",
         "",
         "---",
         "",
-        "### 🛡️ Blast Radius Containment Receipt",
+        "### Blast Radius Containment Receipt",
         "Compart verified zero unintended side effects across the entire codebase:",
         f"- **Files Scanned**: `{meta.files_scanned}`",
         f"- **Files Modified**: `{meta.files_modified}`",
@@ -64,26 +64,26 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
         "",
         "---",
         "",
-        "### 🧪 Automated Verification Evidence",
+        "### Automated Verification Evidence",
         f"- **Test Command**: `{meta.test_command}`",
         f"- **Exit Code**: `{meta.test_exit_code}` ({test_status_str})",
         f"- **Duration**: `{meta.test_duration_ms}ms`",
         "",
         "---",
         "",
-        "### 🔍 Surgical Patch Preview",
+        "### Surgical Patch Preview",
         diff_block,
         "",
         "---",
         "",
-        "### 📋 Callsite Triage",
+        "### Callsite Triage",
         f"- **Confirmed Affected**: `{len(meta.impacted_callsites)}` callsites surgically patched.",
         f"- **Unaffected Safe**: `{len(meta.unaffected_callsites)}` callsites verified compatible with `{meta.to_version}`.",
         f"- **Quarantined for Review**: `{meta.quarantined_callsites_count}` callsites.",
         "",
         "---",
         "",
-        "### 🚀 Next Steps",
+        "### Next Steps",
         "This autonomous patch has passed all local tests and blast-radius verification.",
         "- [ ] Review diff preview above.",
         "- [ ] Click **Merge pull request** to apply update to `main`.",

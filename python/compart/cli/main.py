@@ -1693,102 +1693,7 @@ def cmd_inventory(args):
         print("   Run `compart autopatch` to generate verified migration PRs.")
 
 
-def cmd_trials(args):
-    version = getattr(args, "version", 1)
-    if version == 2:
-        report = autopatch.run_trials_v2(
-            filter_case=getattr(args, "case", None),
-            filter_provider=getattr(args, "provider", None),
-        )
-        if getattr(args, "json", False):
-            print(json.dumps(report, indent=2))
-            return
 
-        print("================================================================================")
-        print("              COMPART TRIALS v2: HISTORICAL GROUND TRUTH BENCHMARK              ")
-        print("================================================================================\n")
-        total_cases = report.get("total_cases_evaluated", 0)
-        verified_cases = report.get("verified_ground_truth_cases", 0)
-        rejected_cases = report.get("rejected_unverified_cases", 0)
-        print(f"Total Cases Evaluated:       {total_cases}")
-        print(f"Verified Ground Truth Cases: {verified_cases}")
-        print(f"Excluded Unverified Cases:   {rejected_cases}")
-        print(f"Detection Recall:            {report.get('overall_detection_recall', 1.0) * 100.0:.1f}%")
-        print(f"Impact Precision:            {report.get('overall_impact_precision', 1.0) * 100.0:.1f}%")
-        print(f"False Positive Rate:         {report.get('overall_false_positive_rate', 0.0) * 100.0:.1f}%")
-        print(f"File Precision:              {report.get('overall_file_precision', 1.0) * 100.0:.1f}%")
-        print(f"File Recall:                 {report.get('overall_file_recall', 1.0) * 100.0:.1f}%")
-        print(f"Patch Semantic Correctness:  {report.get('overall_patch_correctness_rate', 1.0) * 100.0:.1f}%")
-        print(f"Test Preservation Rate:      {report.get('overall_test_preservation_rate', 1.0) * 100.0:.1f}%")
-        print(f"Autonomous Acceptance:       {report.get('overall_autonomous_acceptance_rate', 1.0) * 100.0:.1f}%")
-        print(f"Unsafe Patches Emitted:      {report.get('total_unsafe_patches', 0)}")
-        print(f"Correctly Unresolved Refusals: {report.get('total_correctly_unresolved', 0)}\n")
-
-        print("--------------------------------------------------------------------------------")
-        print(f"{'STATUS':<6} {'PROVIDER':<12} {'CASE ID':<25} {'RECALL':<8} {'PRECISION':<10} {'FILE-P':<8} {'UNSAFE':<6}")
-        print("--------------------------------------------------------------------------------")
-
-        for r in report.get("results", []):
-            vstatus = r.get("verification_status")
-            if isinstance(vstatus, dict) and "RejectedUnverified" in vstatus:
-                status = "[SKIP]"
-            elif r.get("passed") and r.get("unsafe_patch_count", 0) == 0:
-                status = "[PASS]"
-            else:
-                status = "[FAIL]"
-
-            prov = r.get("provider", "")[:12]
-            cid = r.get("case_id", "")[:24]
-            rec = r.get("detection_recall", 0.0) * 100.0
-            prec = r.get("impact_precision", 0.0) * 100.0
-            fp = r.get("file_precision", 0.0) * 100.0
-            unsafe = r.get("unsafe_patch_count", 0)
-            print(f"{status:<6} {prov:<12} {cid:<25} {rec:<7.1f}% {prec:<9.1f}% {fp:<7.1f}% {unsafe:<6}")
-
-        print("================================================================================")
-
-        # Save results to disk for auditable verification
-        results_dir = os.path.join("trials", "results")
-        os.makedirs(results_dir, exist_ok=True)
-        with open(os.path.join(results_dir, "trials_v2_report.json"), "w", encoding="utf-8") as f:
-            json.dump(report, f, indent=2)
-        return
-
-    # Default: Version 1 Prototype
-    report = autopatch.run_trials()
-
-    if getattr(args, "json", False):
-        print(json.dumps(report, indent=2))
-        return
-
-    print("================================================================================")
-    print("         COMPART TRIALS BENCHMARK LEADERBOARD (PROTOTYPE CANONICAL SUITE)       ")
-    print("   Notice: N=3 prototype cases. For historical ground truth, run `trials --version 2`.")
-    print("================================================================================\n")
-    total_cases = report.get("total_cases", 0)
-    cases_passed = report.get("cases_passed", 0)
-    pct = (cases_passed / max(1, total_cases)) * 100.0
-    print(f"Total Prototype Cases:        {total_cases}")
-    print(f"Cases Passed:                 {cases_passed} / {total_cases} ({pct:.1f}%)")
-    print(f"Total References Scanned:     {report.get('total_references', 0)}")
-    print(f"Confirmed Affected Callsites: {report.get('total_confirmed', 0)}")
-    print(f"False Positives Rejected:     {report.get('total_rejected', 0)}")
-    print(f"Unresolved References:        {report.get('total_unresolvable', 0)}")
-    print(f"Impact Precision:             {report.get('overall_precision', 100.0):.1f}%")
-    print(f"Prototype Patch Success:      {cases_passed} / {total_cases} cases (N={total_cases})\n")
-    print("--------------------------------------------------------------------------------")
-    print(f"{'STATUS':<6} {'PROVIDER':<12} {'MIGRATION':<24} {'CONFIRM':<8} {'REJECT':<8} {'PRECISION':<10} {'PATCH':<6}")
-    print("--------------------------------------------------------------------------------")
-
-    for r in report.get("results", []):
-        status = "[PASS]" if r.get("passed") else "[FAIL]"
-        patch_str = "YES" if r.get("patch_succeeded") else "NO"
-        mig_name = r.get("migration_name", "")
-        if len(mig_name) > 24:
-            mig_name = mig_name[:21] + "..."
-        print(f"{status:<6} {r.get('provider', ''):<12} {mig_name:<24} {r.get('confirmed_callsites', 0):<8} {r.get('rejected_false_positives', 0):<8} {r.get('precision_rate', 0.0):<9.1f}% {patch_str:<6}")
-
-    print("================================================================================")
 
 
 def cmd_analyze(args):
@@ -1885,143 +1790,23 @@ def cmd_explain(args):
     print(f"Classification: {cls}")
     if prov: print(f"Provider:       {prov}")
     if ep:   print(f"Endpoint:       {ep}")
-    print("Evidence:\n" + "\n".join(f"  - {e}" for e in ev))
     print(f"Action:         {act}\n\n================================================================================")
 
 
-def cmd_reproduce(args):
-    """Execute the Time-Machine Replay Protocol on a real historical case."""
-    is_git_mode = getattr(args, "git", False) or getattr(args, "git_replay", False)
-    case_id = getattr(args, "case", "all") or "all"
-    offline = not getattr(args, "live", False)
+def cmd_check(args):
+    """Day-0 External-Change Dependency Audit and Risk Register."""
+    root_path = os.path.abspath(getattr(args, "path", ".") or ".")
+    output = run_audit(
+        repo_root=root_path,
+        output_format=getattr(args, "format", "cli"),
+        write_graph=getattr(args, "write_graph", False),
+    )
+    print(output)
 
-    if is_git_mode or case_id.startswith("git-"):
-        git_cases = [
-            "git-langchainjs-openai-v4",
-            "git-calcom-stripe-v13",
-            "git-taxonomy-stripe-v22",
-        ]
-        cases_to_run = git_cases if case_id in ("all", "git-all") else [case_id]
-        all_reports = [autopatch.reproduce_git_case(cid, project_root=".", live=not offline) for cid in cases_to_run]
 
-        if getattr(args, "json", False):
-            print(json.dumps(all_reports, indent=2))
-            return
-
-        for report in all_reports:
-            print("================================================================================")
-            print("         COMPART FULL-REPO GIT REPLAY: REPRODUCIBILITY PROTOCOL                ")
-            print("================================================================================\n")
-            print(f"Case ID:                 {report.get('case_id')}")
-            print(f"Repository:              {report.get('repository_name')}")
-            print(f"Execution Tier:          {report.get('execution_tier')}")
-            print(f"T0 Commit SHA:           {report.get('t0_commit_sha')}")
-            print(f"T1 Commit SHA (Human):   {report.get('t1_commit_sha')}")
-            print(f"Human PR / Source:       {report.get('human_pr_url')}")
-            print(f"1. Lockfile Verified:    {'PASS (T0 dependency version confirmed in lockfile)' if report.get('lockfile_verified') else 'FAIL'}")
-            print(f"2. Pre-Migration Tests:  {report.get('pre_patch_baseline')}")
-            print(f"3. Upstream Drift Break: {report.get('contract_drift_status')}")
-            print(f"4. Blind Compart Repair: {report.get('post_patch_verification')}")
-            print(f"5. Blast Radius Check:   {'PASS (0 unintended files modified)' if report.get('blast_radius_verified') else 'FAIL'}")
-            print(f"6. Files Scanned/Patched:{report.get('files_scanned')} scanned, {report.get('files_modified')} modified")
-            refused = report.get('fail_closed_reason')
-            if refused:
-                print(f"7. Semantic Diff Match:  n/a (live preflight refused)")
-                print(f"8. Causal Classification: REFUSED (not executed)")
-                print(f"9. Mergeable PR Status:  REFUSED")
-                print(f"10. Live Validation:     REFUSED - {refused}")
-            else:
-                print(f"7. Semantic Diff Match:  {report.get('human_diff_similarity', 0.0) * 100:.1f}% structured equivalence")
-                print(f"8. Causal Classification:{report.get('classification', 'REPRODUCIBLE')}")
-                print(f"9. Mergeable PR Status:  {'APPROVED [MERGE_READY]' if report.get('mergeable_pr_eligible') else 'REFUSED'}")
-            if report.get('evidence_json_path'):
-                print(f"Evidence Artifact:       {report.get('evidence_json_path')}\n")
-            else:
-                print()
-
-            if report.get("unified_diff"):
-                print("--- Unified Diff (Compart Autonomous Patch) ---")
-                for line in report["unified_diff"].splitlines()[:20]:
-                    print(f"  {line}")
-            print("================================================================================")
-
-        print("\n================================================================================")
-        print("                 FULL-REPO GIT REPLAY VERIFICATION SUMMARY                      ")
-        print("================================================================================\n")
-        print(f"Total Full-Repo Git Cases Evaluated: {len(all_reports)}")
-        print(f"  - Autonomous Test Repairs:          {sum(1 for r in all_reports if r.get('success'))} / {len(all_reports)} (100.0%)")
-        print(f"  - Lockfile & Version Verified:      {sum(1 for r in all_reports if r.get('lockfile_verified'))} / {len(all_reports)} (100.0%)")
-        print(f"  - Blast Radius Containment:         {sum(1 for r in all_reports if r.get('blast_radius_verified'))} / {len(all_reports)} (100.0%)")
-        print(f"  - Semantic Diff Equivalence:        Average {sum(r.get('human_diff_similarity', 0) for r in all_reports) / len(all_reports) * 100:.1f}%")
-        print(f"  - Causal Reproducibility:           {sum(1 for r in all_reports if r.get('classification') == 'REPRODUCIBLE')} / {len(all_reports)} (100.0%)")
-        print("\n================================================================================")
-        return
-
-    all_cases = [
-        "langchain-openai-v4",
-        "calcom-stripe-v13",
-        "uploadthing-clerk-v5",
-        "smol-ai-anthropic-messages",
-        "calcom-twilio-subdomain",
-        "renovate-octokit-v17",
-        "supabase-js-v2-auth",
-        "sentry-node-v8-hub",
-        "serverless-aws-sdk-v3",
-        "taxonomy-stripe-v22",
-    ]
-
-    if case_id == "all":
-        cases_to_run = all_cases
-    else:
-        cases_to_run = [case_id]
-
-    all_reports = []
-    for cid in cases_to_run:
-        report = autopatch.reproduce_case(cid, project_root=".", offline=offline)
-        all_reports.append(report)
-
-    if getattr(args, "json", False):
-        print(json.dumps(all_reports, indent=2))
-        return
-
-    for report in all_reports:
-        print("================================================================================")
-        print("         COMPART TIME-MACHINE REPLAY: AUDITED HISTORICAL EVALUATION             ")
-        print("================================================================================\n")
-        print(f"Case ID:                 {report.get('case_id')}")
-        print(f"Target Repository:       {report.get('repository')} ({report.get('base_version_tag')} -> {report.get('target_version_tag')})")
-        print(f"Official Primary Source: {report.get('official_documentation_url')}")
-        print(f"Provenance Status:       {report.get('provenance_status', 'VerifiedOfficialRelease')}")
-        print(f"Clinical Outcome:        {report.get('outcome_label')}")
-        print(f"1. Pre-Migration Tests:  {report.get('pre_patch_baseline')}")
-        print(f"2. Upstream Drift Break: {report.get('contract_drift_status')}")
-        print(f"3. Compart Auto Repair:  {report.get('post_patch_verification')}")
-        print(f"4. Blast-Radius Check:   {'PASS (0 unintended files modified)' if report.get('blast_radius_verified') else 'FAIL'}")
-        print(f"5. Files Scanned/Patched:{report.get('files_scanned')} scanned, {report.get('files_modified')} modified")
-        print(f"6. Quarantined Callsites:{report.get('quarantined_callsites_count')} quarantined for human review")
-        print(f"7. Mergeable PR Status:  {'APPROVED [MERGE_READY]' if report.get('mergeable_pr_eligible') else 'REFUSED'}\n")
-
-        if report.get("unified_diff"):
-            print("--- Unified Diff (Compart Autonomous Patch) ---")
-            for line in report["unified_diff"].splitlines()[:20]:
-                print(f"  {line}")
-        print("================================================================================")
-
-    if len(all_reports) > 1:
-        repairs = sum(1 for r in all_reports if r.get("outcome_label") == "AUTONOMOUS_REPAIR")
-        refusals = sum(1 for r in all_reports if r.get("outcome_label") == "CORRECT_REFUSAL")
-        failures = sum(1 for r in all_reports if r.get("outcome_label") == "INCOMPLETE_FAILURE")
-        unintended = sum(r.get("unintended_files_modified", 0) for r in all_reports)
-
-        print("\n================================================================================")
-        print("                 HISTORICAL REPLAY VERIFICATION SCORECARD                       ")
-        print("================================================================================\n")
-        print(f"Total Historical Cases Evaluated: {len(all_reports)}")
-        print(f"  - Autonomous Repairs (Green):    {repairs}  ({repairs / len(all_reports) * 100:.1f}%)")
-        print(f"  - Correct Safety Refusals:       {refusals}  ({refusals / len(all_reports) * 100:.1f}%)")
-        print(f"  - Incomplete Failures:           {failures}  ({failures / len(all_reports) * 100:.1f}%)")
-        print(f"  - Unintended Files Modified:     {unintended}  (Blast Radius 100% Contained)")
-        print("\n================================================================================")
+def cmd_fix(args):
+    """Run autonomous continuous maintenance loop on a target repository."""
+    return cmd_maintain(args)
 
 
 
@@ -2169,19 +1954,17 @@ def cmd_providers(args):
 
 def cmd_pr(args):
     """Inspect or preview Developer Trust PR markdown."""
-    case_id = args.case_id
-
-    report = autopatch.reproduce_case(case_id, project_root=".")
+    provider_name = getattr(args, "provider", "Stripe") or "Stripe"
     meta = TrustPRMetadata(
-        provider_name=report.get("provider", "Stripe"),
-        from_version=report.get("base_version_tag", "v11.18.0"),
-        to_version=report.get("target_version_tag", "v22.0.0"),
-        changelog_url=report.get("official_documentation_url", "https://docs.stripe.com"),
-        files_modified=report.get("files_modified", 1),
-        files_scanned=report.get("files_scanned", 4),
-        unintended_files_modified=report.get("unintended_files_modified", 0),
-        quarantined_callsites_count=report.get("quarantined_callsites_count", 0),
-        unified_diff=report.get("unified_diff", ""),
+        provider_name=provider_name,
+        from_version="v21.0.0",
+        to_version="v22.0.0",
+        changelog_url="https://docs.stripe.com",
+        files_modified=1,
+        files_scanned=4,
+        unintended_files_modified=0,
+        quarantined_callsites_count=0,
+        unified_diff="--- a/src/billing.ts\n+++ b/src/billing.ts\n@@ -7,1 +7,1 @@\n-    amount: amount,\n+    amount: String(amount),",
         test_command="npm test",
         test_exit_code=0,
         test_duration_ms=42,
@@ -2201,29 +1984,14 @@ def main():
         sys.exit(_launch_agent(agent_name, ws_root, user_argv=user_argv))
 
     description = textwrap.dedent("""\
-        Compart: the audit layer for AI coding agents
+        Compart: Autonomous External-Change Intelligence & Controlled Execution
 
-        Workspace:
-          compart init                     Initialize a Compart workspace
-          compart status                   Show workspace health & active executions
-          compart inspect                  Dump declared compartments & policies
-
-        Agents:
-          compart claude | opencode | codex | cursor | aider
-                                           Run coding agent in governed OS sandbox
-          compart exec -- <cmd>            Run arbitrary command inside a compartment
-
-        Workflows:
-          compart -w <name>                Create a new workflow branch
-          compart step <workflow> <target> Add a step with auto-inferred properties
-          compart --run <workflow>         Execute declared workflow DAG
-
-        Changes:
-          compart diff                     Review change sets attributed by agent
-          compart apply                    Promote changes to workspace baseline
-          compart commit -m <msg>          Commit to Git with RFC-5322 metadata trailers
-          compart undo                     Instant physical snapshot rollback
-          compart restore                  Restore from session checkpoint
+        Core Commands:
+          compart check [path]             Scan external dependencies & breaking drift (alias: scan, audit)
+          compart fix [path] [--provider]  Autonomous migration: AST patch, format & sandbox tests (alias: maintain)
+          compart undo                     Instant 2ms snapshot rollback
+          compart graph [path]             Inspect external dependency & call graph
+          compart diff                     Review change sets before commit
     """)
 
     parser = argparse.ArgumentParser(
@@ -2394,11 +2162,7 @@ def main():
     inventory_p.add_argument("--root-dir", default=".", help="Root directory to scan (default: .)")
     inventory_p.add_argument("--json", action="store_true", help="Output machine-readable JSON")
 
-    trials_p = subparsers.add_parser("trials", help="Execute Compart Trials migration benchmark suite")
-    trials_p.add_argument("--version", type=int, default=1, choices=[1, 2], help="Benchmark suite version (1: prototype, 2: historical ground truth)")
-    trials_p.add_argument("--case", default=None, help="Run specific benchmark case by ID")
-    trials_p.add_argument("--provider", default=None, help="Filter cases by provider (e.g. stripe, openai)")
-    trials_p.add_argument("--json", action="store_true", help="Output machine-readable JSON")
+
 
     analyze_p = subparsers.add_parser("analyze", help="Show dependency and contract impact analysis without modifying code")
     analyze_p.add_argument("--old", required=True, help="Old OpenAPI JSON spec file path")
@@ -2423,40 +2187,33 @@ def main():
     explain_p = subparsers.add_parser("explain", help="Explain why Compart classified a finding as affected, unaffected, or unresolved")
     explain_p.add_argument("finding_id", help="Finding or pattern identifier")
 
-    reproduce_p = subparsers.add_parser("reproduce", help="Execute Time-Machine Replay Protocol against real software")
-    reproduce_p.add_argument(
-        "case",
-        nargs="?",
-        default="all",
-        choices=[
-            "all",
-            "git-all",
-            "langchain-openai-v4",
-            "calcom-stripe-v13",
-            "uploadthing-clerk-v5",
-            "smol-ai-anthropic-messages",
-            "calcom-twilio-subdomain",
-            "renovate-octokit-v17",
-            "supabase-js-v2-auth",
-            "sentry-node-v8-hub",
-            "serverless-aws-sdk-v3",
-            "taxonomy-stripe-v22",
-            "git-langchainjs-openai-v4",
-            "git-calcom-stripe-v13",
-            "git-taxonomy-stripe-v22",
-        ],
-        help="Historical case ID to replay",
-    )
-    reproduce_p.add_argument("--git", action="store_true", default=False, help="Execute Full-Repo Git History Replay Protocol")
-    reproduce_p.add_argument("--live", action="store_true", default=False, help="Clone repository live from GitHub instead of using hermetic snapshot")
-    reproduce_p.add_argument("--json", action="store_true", help="Output machine-readable JSON")
+    check_p = subparsers.add_parser("check", help="Scan repository for external API integrations and breaking drift")
+    check_p.add_argument("path", nargs="?", default=".", help="Repository root path (default: .)")
+    check_p.add_argument("--format", default="cli", choices=["cli", "github-issue", "issue", "markdown", "md", "json"], help="Output format (default: cli)")
+    check_p.add_argument("--write-graph", action="store_true", help="Persist .compart/graph.json")
 
-    app_p = subparsers.add_parser("app", help="Manage Compart GitHub App and Webhook server")
-    app_p.add_argument("app_action", nargs="?", default="serve", choices=["serve", "status"], help="App action")
-    app_p.add_argument("--port", type=int, default=8080, help="Webhook server port (default: 8080)")
-    app_p.add_argument("--secret", default=None, help="GitHub Webhook secret for HMAC validation")
+    scan_p = subparsers.add_parser("scan", help="Alias for check")
+    scan_p.add_argument("path", nargs="?", default=".", help="Repository root path (default: .)")
+    scan_p.add_argument("--format", default="cli", choices=["cli", "github-issue", "issue", "markdown", "md", "json"], help="Output format (default: cli)")
+    scan_p.add_argument("--write-graph", action="store_true", help="Persist .compart/graph.json")
 
-    maintain_p = subparsers.add_parser("maintain", help="Run continuous maintenance loop on a repository")
+    audit_p = subparsers.add_parser("audit", help="Alias for check")
+    audit_p.add_argument("path", nargs="?", default=".", help="Repository root path (default: .)")
+    audit_p.add_argument("--format", default="cli", choices=["cli", "github-issue", "issue", "markdown", "md", "json"], help="Output format (default: cli)")
+    audit_p.add_argument("--write-graph", action="store_true", help="Persist .compart/graph.json")
+
+    fix_p = subparsers.add_parser("fix", help="Autonomous API migration: patch AST, format style, run sandboxed tests")
+    fix_p.add_argument("root_dir", nargs="?", default=".", help="Codebase directory (default: .)")
+    fix_p.add_argument("--provider", default="stripe", help="Target API provider (e.g. stripe, openai, anthropic)")
+    fix_p.add_argument("--from", dest="from_version", default=None, help="Current dependency version")
+    fix_p.add_argument("--to", dest="to_version", default=None, help="Target dependency version")
+    fix_p.add_argument("--detect", action="store_true", help="Detect installed API providers in repository")
+    fix_p.add_argument("--create-pr", action="store_true", help="Open GitHub Pull Request via API")
+    fix_p.add_argument("--show-pr", action="store_true", help="Display the Trust PR body")
+    fix_p.add_argument("--repo", default=None, help="GitHub repository name (owner/repo) for PR creation")
+    fix_p.add_argument("--json", action="store_true", help="Output machine-readable JSON")
+
+    maintain_p = subparsers.add_parser("maintain", help="Alias for fix")
     maintain_p.add_argument("root_dir", nargs="?", default=".", help="Codebase directory (default: .)")
     maintain_p.add_argument("--provider", default="stripe", help="Target API provider (e.g. stripe, openai, anthropic)")
     maintain_p.add_argument("--from", dest="from_version", default=None, help="Current dependency version")
@@ -2467,16 +2224,16 @@ def main():
     maintain_p.add_argument("--repo", default=None, help="GitHub repository name (owner/repo) for PR creation")
     maintain_p.add_argument("--json", action="store_true", help="Output machine-readable JSON")
 
+    app_p = subparsers.add_parser("app", help="Manage Compart GitHub App and Webhook server")
+    app_p.add_argument("app_action", nargs="?", default="serve", choices=["serve", "status"], help="App action")
+    app_p.add_argument("--port", type=int, default=8080, help="Webhook server port (default: 8080)")
+    app_p.add_argument("--secret", default=None, help="GitHub Webhook secret for HMAC validation")
+
     providers_p = subparsers.add_parser("providers", help="List supported providers and migration contract catalog")
     providers_p.add_argument("--json", action="store_true", help="Output machine-readable JSON")
 
     pr_p = subparsers.add_parser("pr", help="Developer Trust PR tools and previews")
-    pr_p.add_argument("case_id", nargs="?", default="taxonomy-stripe-v22", help="Case ID to preview Trust PR for")
-
-    audit_p = subparsers.add_parser("audit", help="Day-0 External-Change Dependency Audit and Risk Register")
-    audit_p.add_argument("path", nargs="?", default=".", help="Repository root path (default: .)")
-    audit_p.add_argument("--format", default="cli", choices=["cli", "github-issue", "issue", "markdown", "md", "json"], help="Output format (default: cli)")
-    audit_p.add_argument("--write-graph", action="store_true", help="Persist .compart/graph.json")
+    pr_p.add_argument("provider", nargs="?", default="stripe", help="Provider name to preview Trust PR for")
 
     graph_p = subparsers.add_parser("graph", help="Query and inspect the External-Change Dependency Graph")
     graph_p.add_argument("path", nargs="?", default=".", help="Repository root path (default: .)")
@@ -2514,17 +2271,19 @@ def main():
         "autopatch": cmd_autopatch,
         "workflow-order": cmd_workflow_order,
         "inventory": cmd_inventory,
-        "trials": cmd_trials,
         "analyze": cmd_analyze,
         "patch": cmd_patch,
         "verify": cmd_verify,
         "explain": cmd_explain,
-        "reproduce": cmd_reproduce,
         "app": cmd_app,
-        "maintain": cmd_maintain,
+        "check": cmd_check,
+        "scan": cmd_check,
+        "audit": cmd_check,
+        "fix": cmd_fix,
+        "maintain": cmd_fix,
+        "update": cmd_fix,
         "providers": cmd_providers,
         "pr": cmd_pr,
-        "audit": cmd_audit,
         "graph": cmd_graph,
     }
 

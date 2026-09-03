@@ -218,14 +218,14 @@ compart restore sess_1787082470931    # Restores specific session checkpoint
 
 ## 5. External-Change Intelligence & Autonomous Maintenance
 
-### `compart audit [path]`
+### `compart check [path]` (alias: `scan`, `audit`)
 Day-0 external-change dependency audit and risk register. Scans manifests, lockfiles, and AST callsites to report at-risk, deprecated, or breaking external integrations:
 
 ```bash
-compart audit .
-compart audit . --format=github-issue    # Markdown for GitHub Issue
-compart audit . --format=json            # Machine-readable JSON risk register
-compart audit . --write-graph            # Persists .compart/graph.json
+compart check .
+compart check . --format=github-issue    # Markdown for GitHub Issue
+compart check . --format=json            # Machine-readable JSON risk register
+compart check . --write-graph            # Persists .compart/graph.json
 ```
 
 ---
@@ -240,15 +240,15 @@ compart graph . --json
 
 ---
 
-### `compart maintain [root_dir]`
+### `compart fix [root_dir]` (alias: `maintain`, `update`)
 Executes an autonomous continuous maintenance cycle: detects upstream breaking changes, synthesizes surgical AST patches, formats with local tools (`prettier`/`ruff`), runs repository tests, verifies zero blast radius, and opens a Developer Trust PR:
 
 ```bash
-compart maintain . --provider stripe
-compart maintain . --provider openai --from v3.28.0 --to v4.0.0
-compart maintain . --detect              # Detect installed API providers
-compart maintain . --show-pr             # Preview Developer Trust PR body
-compart maintain . --create-pr --repo owner/repo
+compart fix . --provider stripe
+compart fix . --provider openai --from v3.28.0 --to v4.0.0
+compart fix . --detect              # Detect installed API providers
+compart fix . --show-pr             # Preview Developer Trust PR body
+compart fix . --create-pr --repo owner/repo
 ```
 
 ---
@@ -259,16 +259,6 @@ Lists the built-in provider contract registry and available breaking-change migr
 ```bash
 compart providers
 compart providers --json
-```
-
----
-
-### `compart reproduce [case_id]`
-Executes the Time-Machine Replay Protocol against verified real-world ground-truth migrations:
-
-```bash
-compart reproduce all                    # Run all 10 clinical benchmark cases
-compart reproduce --git                  # Run 3 full-repo Git history replay cases
 ```
 
 ---

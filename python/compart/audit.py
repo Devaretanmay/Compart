@@ -22,9 +22,9 @@ def render_audit_cli(summary: Dict[str, Any]) -> str:
 
     at_risk = summary.get("at_risk", [])
     if at_risk:
-        lines.append("🔴 HIGH-RISK / BREAKING DRIFT (Immediate Action Required):")
+        lines.append("[CRITICAL] BREAKING DRIFT (Immediate Action Required):")
         for item in at_risk:
-            lines.append(f"  • Provider:         {item['provider_name']} ({item['package_name']} @ {item['current_version']} -> {item['target_version']})")
+            lines.append(f"  * Provider:         {item['provider_name']} ({item['package_name']} @ {item['current_version']} -> {item['target_version']})")
             lines.append(f"    Breaking Change:  {item['breaking_change']}")
             lines.append(f"    Active Callsites: {item['callsites_count']} callsites across {len(item['affected_files'])} files")
             lines.append(f"    Repair Status:    {'[MERGE_READY AUTO-PATCH]' if item.get('is_auto_repairable') else '[MANUAL REVIEW]'}")
@@ -34,9 +34,9 @@ def render_audit_cli(summary: Dict[str, Any]) -> str:
 
     watchlist = summary.get("watchlist", [])
     if watchlist:
-        lines.append("⚠️  UPCOMING DEPRECATION WATCHLIST:")
+        lines.append("[WATCHLIST] UPCOMING DEPRECATION:")
         for item in watchlist:
-            lines.append(f"  • Provider:         {item['provider_name']} ({item['method_pattern']})")
+            lines.append(f"  * Provider:         {item['provider_name']} ({item['method_pattern']})")
             lines.append(f"    Deadline:         {item['deprecation_deadline']} (~{item.get('days_remaining', 60)} days remaining)")
             lines.append(f"    Active Callsites: {item['callsite_count']} mapped")
             if item.get("documentation_url"):
@@ -45,35 +45,35 @@ def render_audit_cli(summary: Dict[str, Any]) -> str:
 
     healthy = summary.get("healthy", [])
     if healthy:
-        lines.append("🟢 HEALTHY & UP-TO-DATE INTEGRATIONS:")
+        lines.append("[HEALTHY] UP-TO-DATE INTEGRATIONS:")
         for item in healthy:
-            lines.append(f"  • Provider:         {item['provider_name']} ({item['package_name']} @ {item['current_version']})")
+            lines.append(f"  * Provider:         {item['provider_name']} ({item['package_name']} @ {item['current_version']})")
             lines.append(f"    Status:           {item['status_message']} ({item['callsite_count']} callsites)")
             lines.append("")
 
     lines.append("=" * 80)
-    lines.append("Run `compart maintain <path> --provider <name>` to execute autonomous migration.")
+    lines.append("Run `compart fix <path> --provider <name>` to execute autonomous migration.")
     lines.append("=" * 80)
     return "\n".join(lines)
 
 
 def render_audit_github_issue(summary: Dict[str, Any]) -> str:
     lines = []
-    lines.append("# 🛡️ Compart: External Dependency Map & Risk Register\n")
+    lines.append("# Compart: External Dependency Map & Risk Register\n")
     lines.append(f"Compart mapped **{summary.get('total_callsites_mapped', 0)} external API touchpoints** across **{summary.get('total_providers_detected', 0)} providers** in this repository.\n")
 
     at_risk = summary.get("at_risk", [])
     if at_risk:
-        lines.append("### 🔴 Breaking Drift (Immediate Action Required)")
+        lines.append("### Breaking Drift (Immediate Action Required)")
         lines.append("| Provider | Detected Package | Current -> Target | Active Callsites | Breaking Drift | Autonomous Action |")
         lines.append("| :--- | :--- | :--- | :--- | :--- | :--- |")
         for item in at_risk:
-            lines.append(f"| **{item['provider_name']}** | `{item['package_name']}` | `{item['current_version']}` -> `{item['target_version']}` | **{item['callsites_count']} callsites** ({len(item['affected_files'])} files) | {item['breaking_change']} | `compart maintain --provider {item['provider_name'].lower()}` [MERGE_READY] |")
+            lines.append(f"| **{item['provider_name']}** | `{item['package_name']}` | `{item['current_version']}` -> `{item['target_version']}` | **{item['callsites_count']} callsites** ({len(item['affected_files'])} files) | {item['breaking_change']} | `compart fix --provider {item['provider_name'].lower()}` [MERGE_READY] |")
         lines.append("")
 
     watchlist = summary.get("watchlist", [])
     if watchlist:
-        lines.append("### ⚠️ Upcoming Deprecation Watchlist")
+        lines.append("### Upcoming Deprecation Watchlist")
         lines.append("| Provider | Method / Pattern | Deprecation Deadline | Days Remaining | Documentation |")
         lines.append("| :--- | :--- | :--- | :--- | :--- |")
         for item in watchlist:
@@ -82,7 +82,7 @@ def render_audit_github_issue(summary: Dict[str, Any]) -> str:
 
     healthy = summary.get("healthy", [])
     if healthy:
-        lines.append("### 🟢 Healthy & Up-to-Date Integrations")
+        lines.append("### Healthy & Up-to-Date Integrations")
         for item in healthy:
             lines.append(f"- **{item['provider_name']}** (`{item['package_name']}@{item['current_version']}`): {item['status_message']} ({item['callsite_count']} callsites mapped)")
         lines.append("")

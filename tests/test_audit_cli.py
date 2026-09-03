@@ -29,7 +29,7 @@ def test_cli_audit_default():
 def test_cli_audit_github_issue():
     result = _run_compart_cli(["audit", "trials/fixtures/taxonomy_stripe/", "--format=github-issue"])
     assert result.returncode == 0
-    assert "# 🛡️ Compart: External Dependency Map & Risk Register" in result.stdout
+    assert "# Compart: External Dependency Map & Risk Register" in result.stdout
     assert "| **Stripe** |" in result.stdout
 
 
@@ -45,3 +45,17 @@ def test_cli_graph():
     result = _run_compart_cli(["graph", "trials/fixtures/taxonomy_stripe/"])
     assert result.returncode == 0
     assert "COMPART: EXTERNAL-CHANGE DEPENDENCY GRAPH" in result.stdout
+
+
+def test_cli_check_default():
+    result = _run_compart_cli(["check", "trials/fixtures/taxonomy_stripe/"])
+    assert result.returncode == 0
+    assert "COMPART: EXTERNAL-CHANGE DEPENDENCY AUDIT" in result.stdout
+    assert "Stripe" in result.stdout
+
+
+def test_cli_fix_detect():
+    result = _run_compart_cli(["fix", "trials/fixtures/taxonomy_stripe/", "--detect"])
+    assert result.returncode == 0
+    assert "COMPART AUTONOMOUS MAINTENANCE LOOP" in result.stdout
+

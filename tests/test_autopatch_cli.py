@@ -172,24 +172,6 @@ def test_cli_inventory(capsys):
         assert "Stripe" in captured.out
 
 
-def test_cli_trials(capsys):
-    sys.argv = ["compart", "trials"]
-    main()
-    captured = capsys.readouterr()
-    assert "COMPART TRIALS BENCHMARK LEADERBOARD" in captured.out
-    assert "[PASS]" in captured.out
-    assert "Stripe" in captured.out
-    assert "Anthropic" in captured.out
-    assert "Twilio" in captured.out
 
-
-def test_cli_trials_json(capsys):
-    sys.argv = ["compart", "trials", "--json"]
-    main()
-    captured = capsys.readouterr()
-    data = json.loads(captured.out)
-    assert data["total_cases"] >= 3
-    assert data["cases_passed"] == data["total_cases"]
-    assert data["patch_success_rate"] >= 90.0
 
 

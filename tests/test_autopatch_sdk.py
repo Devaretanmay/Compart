@@ -170,12 +170,7 @@ def test_workflow_validate_and_order():
     assert order == ["fetch", "scan", "patch"]
 
 
-def test_run_trials_sdk():
-    report = autopatch.run_trials()
-    assert report["total_cases"] >= 3
-    assert report["cases_passed"] == report["total_cases"]
-    assert report["overall_precision"] > 0
-    assert report["patch_success_rate"] >= 90.0
+
 
 
 def test_apply_patch_sdk():
@@ -240,15 +235,6 @@ def test_false_positive_regressions():
         assert "PROVABLY UNAFFECTED" in report or "No confirmed affected callsites" in report
 
 
-def test_trials_v2_sdk():
-    """Verify Trials v2 runner computes historical metrics and rejects unverified cases."""
-    summary = autopatch.run_trials_v2()
-    assert summary["total_cases_evaluated"] >= 4
-    assert summary["verified_ground_truth_cases"] >= 3
-    assert summary["rejected_unverified_cases"] >= 1
-    assert summary["total_unsafe_patches"] == 0
-    assert summary["overall_detection_recall"] >= 0.99
-    assert summary["overall_file_precision"] >= 0.99
-    assert summary["overall_test_preservation_rate"] >= 0.99
+
 
 

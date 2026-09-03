@@ -34,7 +34,7 @@ def test_render_audit_formats():
     assert "Stripe" in cli_out
     
     issue_out = render_audit_github_issue(summary)
-    assert "🛡️ Compart: External Dependency Map & Risk Register" in issue_out
+    assert "Compart: External Dependency Map & Risk Register" in issue_out
     assert "| **Stripe** |" in issue_out
 
 

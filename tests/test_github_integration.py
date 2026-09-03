@@ -63,7 +63,7 @@ def test_trust_pr_markdown_generation():
     )
 
     markdown = generate_trust_pr_markdown(meta)
-    assert "✅ Autonomous Maintenance: Upgrade `Stripe Node SDK`" in markdown
+    assert "[VERIFIED] Autonomous Maintenance: Upgrade `Stripe Node SDK`" in markdown
     assert "Blast Radius Containment Receipt" in markdown
     assert "100% Contained" in markdown
     assert "amount: String(amount)" in markdown

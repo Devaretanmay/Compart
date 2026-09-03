@@ -16,7 +16,7 @@ pip install --upgrade compart
 
 ---
 
-## 2. Day-0 Dependency Audit & Risk Register
+## 2. Day-0 Dependency Check & Risk Register
 
 Immediately scan your codebase for breaking upstream API changes, deprecated callsites, and auto-repairable integrations:
 
@@ -24,10 +24,10 @@ Immediately scan your codebase for breaking upstream API changes, deprecated cal
 cd my-project
 
 # Run terminal risk register:
-compart audit .
+compart check .
 
 # Export as GitHub Issue markdown:
-compart audit . --format=github-issue
+compart check . --format=github-issue
 
 # Inspect the External-Change Dependency Graph:
 compart graph .
@@ -41,10 +41,10 @@ Run autonomous maintenance on external providers (e.g. Stripe, OpenAI, Anthropic
 
 ```bash
 # Detect drift and run surgical AST patch loop:
-compart maintain . --provider stripe
+compart fix . --provider stripe
 
 # Custom version bump and open PR:
-compart maintain . --provider openai --from v3.28.0 --to v4.0.0 --create-pr --repo owner/repo
+compart fix . --provider openai --from v3.28.0 --to v4.0.0 --create-pr --repo owner/repo
 ```
 
 ---

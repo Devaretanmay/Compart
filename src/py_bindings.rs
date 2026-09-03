@@ -126,19 +126,6 @@ fn inventory_scan(repo_root: &str) -> PyResult<String> {
 }
 
 #[pyfunction]
-fn trials_run() -> PyResult<String> {
-    let report = crate::engines::autopatch::run_compart_trials();
-    serde_json::to_string_pretty(&report).map_err(|e| PyValueError::new_err(e.to_string()))
-}
-
-#[pyfunction]
-#[pyo3(signature = (filter_case=None, filter_provider=None))]
-fn trials_v2_run(filter_case: Option<&str>, filter_provider: Option<&str>) -> PyResult<String> {
-    let summary = crate::engines::autopatch::run_compart_trials_v2(filter_case, filter_provider);
-    serde_json::to_string_pretty(&summary).map_err(|e| PyValueError::new_err(e.to_string()))
-}
-
-#[pyfunction]
 fn trust_report_render(plan_json: &str) -> PyResult<String> {
     let plan: MaintenancePlan =
         serde_json::from_str(plan_json).map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -152,23 +139,6 @@ fn patch_apply(repo_root: &str, plan_json: &str, dry_run: bool) -> PyResult<Stri
     let results = crate::engines::autopatch::patch_plan_targets(repo_root, &plan, dry_run)
         .map_err(PyValueError::new_err)?;
     serde_json::to_string_pretty(&results).map_err(|e| PyValueError::new_err(e.to_string()))
-}
-
-#[pyfunction]
-#[pyo3(signature = (case_id, project_root=".", offline=true))]
-fn replay_execute(case_id: &str, project_root: &str, offline: bool) -> PyResult<String> {
-    let report =
-        crate::engines::autopatch::execute_historical_replay(case_id, project_root, offline)
-            .map_err(PyValueError::new_err)?;
-    serde_json::to_string_pretty(&report).map_err(|e| PyValueError::new_err(e.to_string()))
-}
-
-#[pyfunction]
-#[pyo3(signature = (case_id, project_root=".", live=false))]
-fn git_replay_execute(case_id: &str, project_root: &str, live: bool) -> PyResult<String> {
-    let report = crate::engines::autopatch::execute_git_history_replay(case_id, project_root, live)
-        .map_err(PyValueError::new_err)?;
-    serde_json::to_string_pretty(&report).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 #[pyfunction]
@@ -199,12 +169,8 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(workflow_validate, m)?)?;
     m.add_function(wrap_pyfunction!(workflow_execution_order, m)?)?;
     m.add_function(wrap_pyfunction!(inventory_scan, m)?)?;
-    m.add_function(wrap_pyfunction!(trials_run, m)?)?;
-    m.add_function(wrap_pyfunction!(trials_v2_run, m)?)?;
     m.add_function(wrap_pyfunction!(trust_report_render, m)?)?;
     m.add_function(wrap_pyfunction!(patch_apply, m)?)?;
-    m.add_function(wrap_pyfunction!(replay_execute, m)?)?;
-    m.add_function(wrap_pyfunction!(git_replay_execute, m)?)?;
     m.add_function(wrap_pyfunction!(dependency_graph_build, m)?)?;
     m.add_function(wrap_pyfunction!(dependency_graph_audit, m)?)?;
     Ok(())

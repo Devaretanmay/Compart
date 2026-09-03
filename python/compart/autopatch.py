@@ -25,12 +25,8 @@ try:
         workflow_validate as _core_workflow_validate,
         workflow_execution_order as _core_workflow_execution_order,
         inventory_scan as _core_inventory_scan,
-        trials_run as _core_trials_run,
-        trials_v2_run as _core_trials_v2_run,
         trust_report_render as _core_trust_report_render,
         patch_apply as _core_patch_apply,
-        replay_execute as _core_replay_execute,
-        git_replay_execute as _core_git_replay_execute,
     )
     _HAS_NATIVE = True
 except ImportError:
@@ -43,12 +39,8 @@ except ImportError:
     _core_workflow_validate = None
     _core_workflow_execution_order = None
     _core_inventory_scan = None
-    _core_trials_run = None
-    _core_trials_v2_run = None
     _core_trust_report_render = None
     _core_patch_apply = None
-    _core_replay_execute = None
-    _core_git_replay_execute = None
 
 
 @dataclass
@@ -136,11 +128,7 @@ def run_inventory(repo_root: str = ".") -> Dict[str, Any]:
     return {"repo_root": repo_root, "dependencies": [], "total_callsites": 0}
 
 
-def run_trials() -> Dict[str, Any]:
-    """Execute the Compart Trials canonical benchmark suite and return the report."""
-    if _HAS_NATIVE and _core_trials_run is not None:
-        return json.loads(_core_trials_run())
-    return {"total_cases": 0, "cases_passed": 0, "results": []}
+
 
 
 def apply_patch(repo_root: str, plan: Dict[str, Any], dry_run: bool = True) -> List[Dict[str, Any]]:
@@ -150,37 +138,8 @@ def apply_patch(repo_root: str, plan: Dict[str, Any], dry_run: bool = True) -> L
     return []
 
 
-def run_trials_v2(filter_case: Optional[str] = None, filter_provider: Optional[str] = None) -> Dict[str, Any]:
-    """Execute Compart Trials v2 against historical ground truth cases."""
-    if _HAS_NATIVE and _core_trials_v2_run is not None:
-        return json.loads(_core_trials_v2_run(filter_case, filter_provider))
-    return {"total_cases_evaluated": 0, "verified_ground_truth_cases": 0, "rejected_unverified_cases": 0, "results": []}
-
-
 def render_trust_report(plan: Dict[str, Any]) -> str:
     """Render an enterprise-grade trust report from a maintenance plan."""
     if _HAS_NATIVE and _core_trust_report_render is not None:
         return _core_trust_report_render(json.dumps(plan))
     return render_markdown_report(plan)
-
-
-def reproduce_case(case_id: str, project_root: str = ".", offline: bool = True) -> Dict[str, Any]:
-    """Execute historical replay against real software commits and official documentation."""
-    if _HAS_NATIVE and _core_replay_execute is not None:
-        return json.loads(_core_replay_execute(case_id, project_root, offline))
-    return {
-        "case_id": case_id,
-        "success": False,
-        "error": "Native core replay extension not available",
-    }
-
-
-def reproduce_git_case(case_id: str, project_root: str = ".", live: bool = False) -> Dict[str, Any]:
-    """Execute Full-Repo Git History Replay Protocol against real software repositories."""
-    if _HAS_NATIVE and _core_git_replay_execute is not None:
-        return json.loads(_core_git_replay_execute(case_id, project_root, live))
-    return {
-        "case_id": case_id,
-        "success": False,
-        "error": "Native core git replay extension not available",
-    }

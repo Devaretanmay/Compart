@@ -45,7 +45,7 @@ Dependabot bumps version strings in lockfiles and leaves CI broken. Human engine
 
 ---
 
-## 1. Day-0 Risk Register (`compart audit`)
+## 1. Day-0 Risk Register (`compart check`)
 
 When you run Compart on any repository, it immediately answers:
 - *What external APIs and SDKs does this codebase depend on?*
@@ -53,7 +53,7 @@ When you run Compart on any repository, it immediately answers:
 - *Which breaking changes can Compart already auto-repair?*
 
 ```bash
-compart audit .
+compart check .
 ```
 
 ```text
@@ -64,26 +64,26 @@ Total External Providers Detected: 3
 Total AST Callsites Mapped:        14
 Auto-Repairable Callsites:         6
 --------------------------------------------------------------------------------
-🔴 AT RISK (Action Required):
-  • Stripe (stripe@v21.0.0 -> v22.0.0)
+[CRITICAL] AT RISK (Action Required):
+  * Stripe (stripe@v21.0.0 -> v22.0.0)
     - Status: Breaking parameter mutation detected (amount: number -> string)
     - 4 callsites affected (4 auto-repairable by Compart)
 
-🟡 WATCHLIST (Deprecated / Pending Retirement):
-  • OpenAI (openai@v3.28.0)
+[WATCHLIST] UPCOMING DEPRECATION:
+  * OpenAI (openai@v3.28.0)
     - Status: Deprecated client interface (v4 migration available)
     - 6 callsites affected
 
-🟢 HEALTHY:
-  • Anthropic (@anthropic-ai/sdk@v0.25.0)
+[HEALTHY] UP-TO-DATE INTEGRATIONS:
+  * Anthropic (@anthropic-ai/sdk@v0.25.0)
     - Status: Up-to-date with active provider contract (4 callsites mapped)
 ================================================================================
 ```
 
 Export directly to GitHub Issues or JSON:
 ```bash
-compart audit . --format=github-issue   # Formatted markdown table for GitHub Issues
-compart audit . --format=json           # Machine-readable risk register
+compart check . --format=github-issue   # Formatted markdown table for GitHub Issues
+compart check . --format=json           # Machine-readable risk register
 ```
 
 ---
@@ -91,7 +91,7 @@ compart audit . --format=json           # Machine-readable risk register
 ## 2. External-Change Dependency Graph (`compart graph`)
 
 Compart builds a unified dependency graph linking:
-`Provider → Version → API Contract → Manifest Dependency → Wrapper Client → AST Callsite → Migration History`
+`Provider -> Version -> API Contract -> Manifest Dependency -> Wrapper Client -> AST Callsite -> Migration History`
 
 ```bash
 compart graph .
@@ -117,19 +117,19 @@ Active Graph Edges:      28
 
 ---
 
-## 3. Autonomous Continuous Maintenance (`compart maintain`)
+## 3. Autonomous Continuous Maintenance (`compart fix`)
 
 When upstream providers release breaking changes, Compart detects the drift, synthesizes surgical AST transformations, matches your team's code formatting (`prettier`/`ruff`), validates local tests, and opens a Developer Trust PR:
 
 ```bash
 # Autonomous migration for a target provider:
-compart maintain . --provider stripe
+compart fix . --provider stripe
 
 # Custom version bump:
-compart maintain . --provider openai --from v3.28.0 --to v4.0.0 --create-pr --repo owner/repo
+compart fix . --provider openai --from v3.28.0 --to v4.0.0 --create-pr --repo owner/repo
 ```
 
-### What `compart maintain` guarantees:
+### What `compart fix` guarantees:
 1. **Surgical AST Patching**: Only transforms affected callsites and wrappers.
 2. **Local Formatter Bridge**: Formats changed files with your project's `prettier`, `ruff`, or `biome`.
 3. **Local Test Verification**: Executes test suites and rejects patches if tests remain red.
@@ -138,34 +138,7 @@ compart maintain . --provider openai --from v3.28.0 --to v4.0.0 --create-pr --re
 
 ---
 
-## 4. Audited Ground-Truth Replay Protocol (`compart reproduce`)
-
-Compart has been benchmarked against real-world production repositories that underwent breaking migrations (LangChain, Cal.com, Taxonomy, AWS SDK, Supabase, Clerk, etc.):
-
-```bash
-# Replay 10 clinical benchmark cases:
-compart reproduce all
-
-# Replay 3 full-repo Git history cases:
-compart reproduce --git
-```
-
-```text
-================================================================================
-                 FULL-REPO GIT REPLAY VERIFICATION SUMMARY                      
-================================================================================
-Total Full-Repo Git Cases Evaluated: 3
-  - Autonomous Test Repairs:          3 / 3 (100.0%)
-  - Lockfile & Version Verified:      3 / 3 (100.0%)
-  - Blast Radius Containment:         3 / 3 (100.0%)
-  - Semantic Diff Equivalence:        Average 100.0%
-  - Causal Reproducibility:           3 / 3 (100.0%)
-================================================================================
-```
-
----
-
-## 5. Controlled Execution & Sandboxed Verification
+## 4. Controlled Execution & Sandboxed Verification
 
 Compart provides **controlled, reproducible execution** across local kernel sandboxes (macOS Seatbelt, Linux Landlock), Docker, and CI runners:
 - **Zero-Exfiltration Isolation**: Credentials (`~/.ssh`, `~/.aws`, keychains) denied at the kernel boundary.
