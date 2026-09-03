@@ -1924,9 +1924,16 @@ def cmd_reproduce(args):
             print(f"4. Blind Compart Repair: {report.get('post_patch_verification')}")
             print(f"5. Blast Radius Check:   {'PASS (0 unintended files modified)' if report.get('blast_radius_verified') else 'FAIL'}")
             print(f"6. Files Scanned/Patched:{report.get('files_scanned')} scanned, {report.get('files_modified')} modified")
-            print(f"7. Semantic Diff Match:  {report.get('human_diff_similarity', 0.0) * 100:.1f}% structured equivalence")
-            print(f"8. Causal Classification:{report.get('classification', 'REPRODUCIBLE')}")
-            print(f"9. Mergeable PR Status:  {'APPROVED [MERGE_READY]' if report.get('mergeable_pr_eligible') else 'REFUSED'}")
+            refused = report.get('fail_closed_reason')
+            if refused:
+                print(f"7. Semantic Diff Match:  n/a (live preflight refused)")
+                print(f"8. Causal Classification: REFUSED (not executed)")
+                print(f"9. Mergeable PR Status:  REFUSED")
+                print(f"10. Live Validation:     REFUSED - {refused}")
+            else:
+                print(f"7. Semantic Diff Match:  {report.get('human_diff_similarity', 0.0) * 100:.1f}% structured equivalence")
+                print(f"8. Causal Classification:{report.get('classification', 'REPRODUCIBLE')}")
+                print(f"9. Mergeable PR Status:  {'APPROVED [MERGE_READY]' if report.get('mergeable_pr_eligible') else 'REFUSED'}")
             if report.get('evidence_json_path'):
                 print(f"Evidence Artifact:       {report.get('evidence_json_path')}\n")
             else:

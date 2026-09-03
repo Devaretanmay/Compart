@@ -1,43 +1,38 @@
-# Output Crusher & Token Compression Guide
+# Execution-Evidence Compression & Failure Summarization
 
-Long execution logs, stack traces, and verbose build outputs can quickly overwhelm LLM context windows and increase API costs. Compart includes a native Rust compression engine that compresses agent outputs before returning them to LLM context.
+Sandboxed test suites, build runs, and compiler outputs can easily produce tens of thousands of lines of terminal text. Compart includes high-speed native Rust compression engines (`src/engines/compression/`) to distill verbose test logs down to high-signal failure traces, stack traces, and verification evidence for LLM maintenance agents and Developer Trust PR receipts without exceeding context limits.
 
 ---
 
 ## 1. Core Compression Engines
 
-The Compart Rust core (`src/engines/compression/`) includes four specialized compression engines:
+The Compart Rust core includes four specialized evidence compression engines:
 
-1. **BM25 & Log Crusher**: Filters repetitive log lines (e.g. build output loops, progress bars) while preserving error tracebacks, exceptions, and key status lines.
-2. **Smart Crusher (JSON Compaction)**: Compacts large JSON arrays and API responses into key sample records and structural schemas.
-3. **Diff Compressor**: Trims git diffs to show modified code sections while dropping unchanged context padding.
-4. **Text Crusher**: Performs semantic sentence deduplication and token reduction.
-
----
-
-## 2. Content-Addressable Compression Registry (CCR Cache)
-
-To avoid re-compressing identical log outputs across agent loops, Compart caches compressed outputs in a Content-Addressable Compression Registry (CCR) using BLAKE3 content hashing.
+1. **LogCompressor & Stack Trace Isolator**: Strips noisy repetitive progress loops, polling logs, and build progress bars while preserving critical error tracebacks, panic messages, failing assertion lines, and exit statuses.
+2. **SmartCrusher (JSON & Contract Compaction)**: Compacts large OpenAPI schemas, dependency trees, and payload arrays into structural schemas and representative records.
+3. **DiffCompressor**: Trims massive multi-file diffs to highlight modified AST nodes while preserving file boundaries and syntax integrity.
+4. **TextCrusher**: Extractive summarizer for verbose terminal logs.
 
 ---
 
-## 3. Usage in Agent Workflows
+## 2. Dynamic Content Routing (`route_and_compress`)
+
+Compart automatically detects the content type of execution output (build logs, JSON, diffs, raw text) and applies the optimal engine:
 
 ```python
-from compart.sandbox.compression import CompressionModule
+from compart.maintenance_agents import PatchVerifier
 
-crusher = CompressionModule()
+verifier = PatchVerifier()
+result = verifier.verify(repo_dir=".", test_cmd="npm test")
 
-verbose_log = """
-[INFO] Step 1/100 complete
-[INFO] Step 2/100 complete
-... (95 identical lines) ...
-[ERROR] FileNotFoundError: 'config.yaml' missing on line 42
-"""
-
-# Compress output for LLM context
-compressed_text = crusher.compress(verbose_log, max_tokens=200)
-print(compressed_text)
+print(f"Raw Log: {result.raw_log_bytes} bytes -> Compressed Evidence: {result.compressed_log_bytes} bytes")
+print(result.compressed_execution_log)
 ```
 
-In `AgentCompart`, log crushing is enabled automatically on compartment outputs.
+---
+
+## 3. Why This Matters for Autonomous Maintenance
+
+* **Scalable Evidence Bundles**: Test failure outputs are attached to GitHub PRs and issues without hitting character limits.
+* **Efficient Agent Loops**: When `PatchVerifier` diagnoses a test failure, it feeds high-signal stack traces directly to `PatchPlanner` without blowing token context budgets.
+* **Deterministic Compression**: Fast, reproducible Rust execution ensures evidence is compressed identically across runs.

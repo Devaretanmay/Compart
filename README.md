@@ -31,16 +31,16 @@ Dependabot bumps version strings in lockfiles and leaves CI broken. Human engine
 
 ---
 
-## The 3 Pillars of Compart
+## The Core Pipeline
 
 ```text
-┌───────────────────────────┬───────────────────────────┬──────────────────────────────┐
-│ 1. Day-0 Risk Register    │ 2. External-Change Graph  │ 3. Autonomous AutoPatch      │
-│    `compart audit`        │    `compart graph`        │    `compart maintain`        │
-├───────────────────────────┼───────────────────────────┼──────────────────────────────┤
-│ 4. Audited Git Replay     │ 5. Developer Trust PRs    │ 6. Sandboxed Verification    │
-│    `compart reproduce`    │    Verified evidence diff │    Kernel-isolated execution │
-└───────────────────────────┴───────────────────────────┴──────────────────────────────┘
+┌─────────────────────────┬─────────────────────────┬─────────────────────────┐
+│ 1. Change Detection     │ 2. Dependency Graph     │ 3. Multi-Agent Analysis │
+│    Upstream API Drift   │    Provider → Callsite  │    Impact & Plan Agents │
+├─────────────────────────┼─────────────────────────┼─────────────────────────┤
+│ 4. Surgical AST Patch   │ 5. Controlled Execution │ 6. Developer Trust PR   │
+│    Formatter-matched fix│    Sandboxed + Evidence │    Verified merge-ready │
+└─────────────────────────┴─────────────────────────┴─────────────────────────┘
 ```
 
 ---
@@ -165,16 +165,17 @@ Total Full-Repo Git Cases Evaluated: 3
 
 ---
 
-## 5. Kernel-Sandboxed Execution & Agent Governance
+## 5. Controlled Execution & Sandboxed Verification
 
-Compart incorporates OS kernel sandboxing (macOS Seatbelt, Linux Landlock) and 2ms physical rollback for agent workflows and autonomous test runs:
+Compart provides **controlled, reproducible execution** across local kernel sandboxes (macOS Seatbelt, Linux Landlock), Docker, and CI runners:
+- **Zero-Exfiltration Isolation**: Credentials (`~/.ssh`, `~/.aws`, keychains) denied at the kernel boundary.
+- **Execution-Evidence Compression**: Native Rust engines distill massive test outputs down to high-signal failure traces and stack traces for PR evidence.
+- **2ms Instant Undo**: Pre-execution BLAKE3 hash snapshots enable physical rollback of modified and generated files in 2 milliseconds.
 
 ```bash
 compart init                          # Initialize workspace control plane
-compart claude                        # Run coding agents in kernel-governed sandbox
 compart diff                          # Inspect isolated execution change sets
 compart undo                          # Instant 2ms physical rollback
-compart commit -m "Update Stripe v22" # Embed RFC-5322 Agent Provenance Trailers
 ```
 
 ---

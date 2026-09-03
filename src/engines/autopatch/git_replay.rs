@@ -41,6 +41,8 @@ pub struct GitReplayCase {
     pub target_source_file: String,
     pub test_command: String,
     pub expected_human_diff_snippets: Vec<String>,
+    pub live_supported: bool,
+    pub live_unsupported_reason: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +98,8 @@ pub fn get_available_git_replay_cases() -> Vec<GitReplayCase> {
                 "createChatCompletion".into(),
                 "chat.completions.create".into(),
             ],
+            live_supported: true,
+            live_unsupported_reason: String::new(),
         },
         GitReplayCase {
             id: "git-calcom-stripe-v13".into(),
@@ -115,6 +119,8 @@ pub fn get_available_git_replay_cases() -> Vec<GitReplayCase> {
             target_source_file: "packages/features/ee/billing/stripe.ts".into(),
             test_command: "node test/run.js".into(),
             expected_human_diff_snippets: vec!["amount: String(amount)".into()],
+            live_supported: false,
+            live_unsupported_reason: "human_pr_url https://github.com/calcom/cal.com/pull/8542 returns 404 (PR does not exist); the case cannot be verified against a real migration commit.".into(),
         },
         GitReplayCase {
             id: "git-taxonomy-stripe-v22".into(),
@@ -134,11 +140,51 @@ pub fn get_available_git_replay_cases() -> Vec<GitReplayCase> {
             target_source_file: "src/billing.ts".into(),
             test_command: "node test/run.js".into(),
             expected_human_diff_snippets: vec!["String(amount)".into()],
+            live_supported: false,
+            live_unsupported_reason: "no real stripe-v22 migration PR exists in shadcn-ui/taxonomy: t0 (298a885) is repository HEAD, t1 (f4be613, 2022-12-22 'chore: update dependencies') is an ancestor of t0 (SHAs inverted), stripe never leaves 11.x in real history (t1 declares ^11.1.0), and no commit contains 'String(amount)'. The oracle node test/run.js is fixture-only.".into(),
         },
     ]
 }
 
-/// Execute full Git history replay on a verified historical case.
+fn refused_report(case: &GitReplayCase, reason: String) -> GitReplayExecutionReport {
+    GitReplayExecutionReport {
+        case_id: case.id.clone(),
+        repository_name: case.repository_name.clone(),
+        execution_tier: "Live Preflight REFUSED (execution not attempted)".into(),
+        t0_commit_sha: case.t0_commit_sha.clone(),
+        t1_commit_sha: case.t1_commit_sha.clone(),
+        human_pr_url: case.human_pr_url.clone(),
+        human_diff_source: String::new(),
+        lockfile_verified: false,
+        t0_version_verified: false,
+        pre_patch_baseline: "REFUSED (not executed)".into(),
+        contract_drift_status: "REFUSED (not executed)".into(),
+        post_patch_verification: "REFUSED (not executed)".into(),
+        blast_radius_verified: false,
+        files_scanned: 0,
+        files_modified: 0,
+        unintended_files_modified: 0,
+        unified_diff: String::new(),
+        human_diff_similarity: 0.0,
+        semantic_match: SemanticDiffMatch {
+            overlapping_files: vec![],
+            overlapping_hunks_count: 0,
+            overlapping_semantic_edits: 0,
+            unrelated_human_edits_count: 0,
+            missed_edits_count: 0,
+            extra_edits_count: 0,
+            semantic_score: 0.0,
+        },
+        quarantined_callsites_count: 0,
+        mergeable_pr_eligible: false,
+        success: false,
+        classification: CausalReplayClassification::Inconclusive,
+        evidence_json_path: None,
+        execution_log_path: None,
+        fail_closed_reason: Some(reason),
+    }
+}
+
 pub fn execute_git_history_replay(
     case_id: &str,
     project_root: &str,
@@ -150,6 +196,13 @@ pub fn execute_git_history_replay(
         .find(|c| c.id == case_id || case_id == "all")
         .ok_or_else(|| format!("Unknown Git history replay case: {}", case_id))?;
 
+    if live && !case.live_supported {
+        return Ok(refused_report(
+            &case,
+            format!("LIVE_UNSUPPORTED: {}", case.live_unsupported_reason),
+        ));
+    }
+
     let root_path = Path::new(project_root);
     let fixture_dir = root_path.join(&case.fixture_relative_path);
     let replay_log_dir = root_path.join("logs").join("replays").join(&case.id);
@@ -158,7 +211,6 @@ pub fn execute_git_history_replay(
     let mut log_lines: Vec<String> = Vec::new();
     let env_diag = collect_environment_diagnostics();
 
-    // 1. Setup isolated working directories (T0 working tree and separate T1 clean worktree)
     let t0_working_dir = std::env::temp_dir().join(format!("compart_git_replay_{}_t0", case.id));
     let t1_working_dir = std::env::temp_dir().join(format!("compart_git_replay_{}_t1", case.id));
     if t0_working_dir.exists() {
@@ -205,7 +257,6 @@ pub fn execute_git_history_replay(
         }
         log_lines.push(format!("[LIVE_GIT] Clone successful."));
 
-        // Verify T0 commit exists
         let t0_check = Command::new("git")
             .current_dir(&t0_working_dir)
             .args(&["cat-file", "-e", &format!("{}^{{commit}}", case.t0_commit_sha)])
@@ -221,7 +272,6 @@ pub fn execute_git_history_replay(
         }
         log_lines.push(format!("[LIVE_GIT] T0 Commit SHA verified: {}", case.t0_commit_sha));
 
-        // Checkout T0 commit in T0 working directory
         let checkout_status = Command::new("git")
             .current_dir(&t0_working_dir)
             .args(&["checkout", &case.t0_commit_sha])
@@ -237,7 +287,6 @@ pub fn execute_git_history_replay(
         }
         log_lines.push(format!("[LIVE_GIT] Checked out T0 commit successfully."));
 
-        // Setup separate T1 clean worktree / clone
         let _ = Command::new("git")
             .args(&["clone", "--depth", "50", &case.repository_url, t1_working_dir.to_str().unwrap()])
             .output();
@@ -247,7 +296,6 @@ pub fn execute_git_history_replay(
             .output();
         log_lines.push(format!("[LIVE_GIT] Checked out separate clean T1 worktree at {}", case.t1_commit_sha));
 
-        // Extract real git diff T0..T1
         let diff_out = Command::new("git")
             .current_dir(&t0_working_dir)
             .args(&["diff", &case.t0_commit_sha, &case.t1_commit_sha])
@@ -259,6 +307,69 @@ pub fn execute_git_history_replay(
             String::new()
         };
         log_lines.push(format!("[LIVE_GIT] Extracted real git diff T0..T1 ({} bytes)", diff_str.len()));
+
+        let anc = Command::new("git")
+            .current_dir(&t0_working_dir)
+            .args(["merge-base", "--is-ancestor", &case.t0_commit_sha, &case.t1_commit_sha])
+            .status();
+        if !matches!(anc, Ok(s) if s.success()) {
+            return Ok(refused_report(
+                &case,
+                format!(
+                    "LIVE_SHA_INVERSION: T0 {} is not an ancestor of T1 {}. SHAs are inverted or unrelated to a single migration; refusing rather than fabricating metrics.",
+                    case.t0_commit_sha, case.t1_commit_sha
+                ),
+            ));
+        }
+        if !diff_str.contains(&case.target_source_file) {
+            return Ok(refused_report(
+                &case,
+                format!(
+                    "LIVE_CONTENT_MISMATCH: real git diff T0..T1 does not touch declared target_source_file '{}'. The authored case narrative does not match the real migration commit.",
+                    case.target_source_file
+                ),
+            ));
+        }
+        // 2) Every declared expected human edit must appear in the real diff.
+        let missing_snippets: Vec<&String> = case
+            .expected_human_diff_snippets
+            .iter()
+            .filter(|s| !diff_str.contains(s.as_str()))
+            .collect();
+        if !missing_snippets.is_empty() {
+            return Ok(refused_report(
+                &case,
+                format!(
+                    "LIVE_CONTENT_MISMATCH: expected human edits missing from real git diff T0..T1: {}. Case narrative diverges from the real commit.",
+                    missing_snippets
+                        .iter()
+                        .map(|s| format!("\"{}\"", s))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            ));
+        }
+        // 3) The declared oracle test must exist inside the REAL repository at T0.
+        //    Fixture-injected oracles cannot certify causal RED/GREEN against history.
+        let oracle_missing: Vec<String> = case
+            .test_command
+            .split_whitespace()
+            .filter(|tok| {
+                tok.ends_with(".js") || tok.ends_with(".ts") || tok.ends_with(".mjs") || tok.ends_with(".sh")
+            })
+            .map(|tok| tok.to_string())
+            .filter(|tok| !Path::new(&t0_working_dir).join(tok).exists())
+            .collect();
+        if !oracle_missing.is_empty() {
+            return Ok(refused_report(
+                &case,
+                format!(
+                    "LIVE_ORACLE_ABSENT: oracle test '{}' does not exist in the real repository at T0 (missing file(s): {}). Baseline/drift/post-patch execution cannot be certified against real history; the oracle is fixture-only.",
+                    case.test_command,
+                    oracle_missing.join(", ")
+                ),
+            ));
+        }
 
         (t0_working_dir, "Full-Repo Historical Replay (Live Git Verified)".to_string(), diff_str, "Live Git Diff (git diff T0..T1)".to_string())
     } else {
@@ -324,6 +435,23 @@ pub fn execute_git_history_replay(
     let resolved_dep_t1 = resolve_dependency(&t1_working_dir, &case.dependency_name)
         .map_err(|e| format!("FAIL_CLOSED: T1 Lockfile verification failed: {}", e))?;
     log_lines.push(format!("[VERIFIED] T1 dependency {} resolved as {} in clean T1 tree.", case.dependency_name, resolved_dep_t1.resolved_version));
+
+    // LIVE TIER: the real T1 manifest must resolve the expected post-migration
+    // version. Hermetic mode rewrites the fixture manifest, but live mode must
+    // never fake it - a mismatch means the commit pair is not the migration.
+    if live {
+        let t1_declared_ok = resolved_dep_t1.declared_range.contains(&case.expected_t1_version);
+        let t1_resolved_ok = resolved_dep_t1.resolved_version.contains(&case.expected_t1_version);
+        if !t1_declared_ok && !t1_resolved_ok {
+            return Ok(refused_report(
+                &case,
+                format!(
+                    "LIVE_VERSION_MISMATCH: real T1 manifest resolves '{}' as declared={} resolved={}, expected {}. The commit pair is not a migration to the expected version.",
+                    case.dependency_name, resolved_dep_t1.declared_range, resolved_dep_t1.resolved_version, case.expected_t1_version
+                ),
+            ));
+        }
+    }
 
     // 3. Real Baseline Test Execution at T0
     let baseline_log_file = replay_log_dir.join("baseline.log");
@@ -671,6 +799,25 @@ mod tests {
         let res = execute_git_history_replay("invalid-case-id-12345", ".", false);
         assert!(res.is_err());
         assert!(res.unwrap_err().contains("Unknown Git history replay case"));
+    }
+
+    #[test]
+    fn test_live_tier_refuses_unsupported_case_without_cloning() {
+        // git-taxonomy-stripe-v22 has live_supported=false (verified: SHAs inverted,
+        // no real stripe-v22 migration exists in shadcn-ui/taxonomy history).
+        // The refusal must happen BEFORE any clone/execution and must never
+        // fabricate a semantic score.
+        let report = execute_git_history_replay("git-taxonomy-stripe-v22", ".", true).unwrap();
+        assert!(!report.success);
+        assert!(!report.mergeable_pr_eligible);
+        assert_eq!(report.files_scanned, 0);
+        assert_eq!(report.files_modified, 0);
+        assert_eq!(report.human_diff_similarity, 0.0);
+        assert_eq!(report.unified_diff, "");
+        assert!(report.evidence_json_path.is_none());
+        let reason = report.fail_closed_reason.unwrap_or_default();
+        assert!(reason.contains("LIVE_UNSUPPORTED"), "unexpected reason: {}", reason);
+        assert!(reason.contains("inverted") || reason.contains("no real stripe-v22"), "reason should cite verified findings: {}", reason);
     }
 
     #[test]
