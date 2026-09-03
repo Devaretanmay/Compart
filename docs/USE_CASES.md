@@ -235,12 +235,5 @@ print(res.diffs)                              # audited mutations
 hook.cleanup()
 ```
 
----
-
-All examples above run against `compart==0.9.4` as installed from the wheel
-(including the Rust `_core`). Verification command used for the demo:
-
-```bash
-pip install compart
-python use_case_examples.py
-```
+All examples above run against `compart==1.0.4` as installed from PyPI / wheel
+(including the Rust `_core`).

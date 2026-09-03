@@ -58,4 +58,23 @@ Credential proxy routing rule:
 ### `SandboxRunner(workdir=".", verbose=False, block_network=False)`
 Low-level process execution runner that applies kernel sandbox (Seatbelt / Landlock) to shell commands and captures file diffs.
 - `run(command: str, permissions=None, env=None) -> ExecutionResult`
+
+---
+
+## 3. External-Change Intelligence & AutoPatch APIs
+
+### `from compart import autopatch`
+- `plan_maintenance(old_spec: str, new_spec: str, repo_root: str = ".", config: ScanConfig = None) -> MaintenancePlan`: Generates breaking-change diff, scans callsites, and computes patch targets.
+- `apply_patch(repo_root: str, plan: MaintenancePlan, dry_run: bool = False) -> List[PatchResult]`: Applies surgical AST transformations.
+- `synthesize_contracts(api_name: str, old_ver: str, new_ver: str, specs: List[VerificationSpec], lang: str = "ts") -> str`: Synthesizes Vitest/pytest contract test suites.
+- `reproduce_case(case_id: str, project_root: str = ".", offline: bool = True) -> Dict[str, Any]`: Replays historical breaking migrations against real ground truth.
+
+### `from compart.graph import build_dependency_graph, audit_dependency_graph`
+- `build_dependency_graph(repo_root: str = ".") -> Dict[str, Any]`: Constructs the full External Dependency Graph across manifests, wrappers, and AST callsites.
+- `audit_dependency_graph(repo_root: str = ".") -> Dict[str, Any]`: Generates structured audit summary (at-risk, watchlist, healthy).
+
+### `from compart.maintenance import run_maintenance_cycle, detect_drift`
+- `detect_drift(repo_dir: str, provider_name: str) -> List[Dict[str, Any]]`: Scans for outdated external dependencies.
+- `run_maintenance_cycle(repo_dir: str, provider_name: str, ...) -> MaintenanceReport`: Runs end-to-end drift detection, AST patching, formatting, test verification, and PR creation.
+
 - `run_code(code: str, language="python", permissions=None, env=None) -> ExecutionResult`

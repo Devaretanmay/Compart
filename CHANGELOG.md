@@ -4,6 +4,14 @@ All notable changes to Compart are documented here.
 
 ## [Unreleased]
 
+### Added
+- **External-Change Dependency Graph (`compart graph`).** Native Rust graph engine mapping external providers, versions, OpenAPI contracts, manifest dependencies, wrapper clients, and AST callsites.
+- **Day-0 Risk Register (`compart audit`).** Instant audit command scanning codebases for at-risk, deprecated, and auto-repairable external API callsites with ANSI and GitHub Issue markdown exports.
+- **Autonomous Continuous Maintenance (`compart maintain`).** Closed-loop maintenance engine detecting upstream breaking changes, synthesizing surgical AST patches, running local formatters (`prettier`, `ruff`), and opening verified Developer Trust PRs.
+- **Provider Contract Registry (`compart providers`).** Pre-indexed breaking-change contract catalog for Stripe, OpenAI, Anthropic, Clerk, Sentry, Supabase, Twilio, Octokit, and AWS SDK.
+- **Time-Machine Replay Protocol (`compart reproduce`).** Historical benchmark engine evaluating verified ground-truth migrations against real open-source repositories with zero blast radius.
+- **GitHub App & Webhook Server (`compart app`).** Continuous webhook daemon for automated PR drift detection and verification.
+
 ### Changed
 - **Relicensed Apache-2.0.** The project moves from Elastic License 2.0 to the
   Apache License 2.0. The Compart name and logo remain trademarks of Compart
@@ -14,8 +22,6 @@ All notable changes to Compart are documented here.
   adding `Agent-Origin` classification and collapsing security detail to the
   spec's `clean`/`blocked` enum so trailers stay grep-queryable. Releases
   prior to 1.1 wrote legacy `Compart-*` names; readers should accept both.
-
-### Added
 - **SPEC.md.** Open specification for Agent Provenance Trailers - plain git,
   neutral naming, CC0 license text, legacy compatibility mapping.
 - **CLA.md.** Contributor license agreement keeping future dual-licensing open.

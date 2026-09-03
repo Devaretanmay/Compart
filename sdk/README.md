@@ -38,7 +38,7 @@ npm test
 ```ts
 import * as compart from '@compart/sdk'
 
-compart.version()                    // "0.9.4"
+compart.version()                    // "1.0.4"
 compart.sandboxSupported()           // true
 const out = compart.compress(text)
 
@@ -70,4 +70,4 @@ from compart import Compart
 - The TypeScript SDK's `Runtime` handle (and the Rust core's `names()`
   method) is exercised by `npm test`.
 - The Rust core, Python package, TypeScript package, platform packages, and
-  napi crate are kept in lockstep at `0.9.4`.
+  napi crate are kept in lockstep at `1.0.4`.

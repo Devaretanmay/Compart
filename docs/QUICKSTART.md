@@ -65,9 +65,24 @@ compart commit -m "Automate document pipeline run"
 
 ---
 
-## 4. Key Guarantees
+## 4. Day-0 Dependency Audit & Autonomous Maintenance
+
+Audit your codebase for breaking upstream API changes or run automated maintenance:
+
+```bash
+# Day-0 risk register across all SDK callsites:
+compart audit .
+
+# Run autonomous maintenance on an external provider (e.g. Stripe, OpenAI):
+compart maintain . --provider stripe
+```
+
+---
+
+## 5. Key Guarantees
 
 - **Kernel Enforcement**: Built on native OS isolation (macOS Seatbelt / Linux Landlock).
+- **External Intelligence**: AST-level tracking of providers, contracts, wrappers, and callsites.
 - **Credential Protection**: `~/.ssh`, `~/.aws`, `~/.config/gcloud`, git credentials, and keychains are denied by default.
 - **Instant Rollback**: Hash-based BLAKE3 file snapshots allow physical restoration of modified and deleted files in 2ms.
 - **Zero Infrastructure**: No Docker, no daemon, no cloud account required.
