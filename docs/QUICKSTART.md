@@ -2,7 +2,7 @@
 
 Get up and running with Compart in under 2 minutes.
 
-> **“Git manages your code. Compart manages your agents.”**
+> **“Greptile understands changes humans make to software. Compart understands changes the outside world makes to software.”**
 
 ---
 
@@ -16,73 +16,60 @@ pip install --upgrade compart
 
 ---
 
-## 2. Interactive AI Coding Agents
+## 2. Day-0 Dependency Audit & Risk Register
 
-Run your favorite terminal coding agent inside a kernel-enforced sandbox with full native TUI fidelity:
+Immediately scan your codebase for breaking upstream API changes, deprecated callsites, and auto-repairable integrations:
 
 ```bash
 cd my-project
-compart init
 
-# Launch Claude Code, OpenCode, Codex, Cursor, or Aider directly:
-compart claude
-```
-
-When the agent finishes, inspect changes or rollback if needed:
-
-```bash
-compart diff    # Review what the agent changed
-compart commit  # Commit to Git with verified provenance trailers
-compart undo    # Instantly restore files if the agent made a mistake
-```
-
----
-
-## 3. Building Multi-Agent Workflows in 3 Steps
-
-Turn your existing Python scripts into a sandboxed, rollback-capable pipeline:
-
-### Step 1: Create a workflow branch
-```bash
-compart -w document-pipeline
-```
-
-### Step 2: Add your scripts
-```bash
-# Add a folder of scripts in one go (auto-infers types & chains dependencies):
-compart step document-pipeline src/
-```
-
-### Step 3: Run the pipeline
-```bash
-compart --run document-pipeline
-```
-
-### Step 4: Commit with provenance
-```bash
-compart commit -m "Automate document pipeline run"
-```
-
----
-
-## 4. Day-0 Dependency Audit & Autonomous Maintenance
-
-Audit your codebase for breaking upstream API changes or run automated maintenance:
-
-```bash
-# Day-0 risk register across all SDK callsites:
+# Run terminal risk register:
 compart audit .
 
-# Run autonomous maintenance on an external provider (e.g. Stripe, OpenAI):
+# Export as GitHub Issue markdown:
+compart audit . --format=github-issue
+
+# Inspect the External-Change Dependency Graph:
+compart graph .
+```
+
+---
+
+## 3. Autonomous Continuous Maintenance
+
+Run autonomous maintenance on external providers (e.g. Stripe, OpenAI, Anthropic, Clerk, AWS):
+
+```bash
+# Detect drift and run surgical AST patch loop:
 compart maintain . --provider stripe
+
+# Custom version bump and open PR:
+compart maintain . --provider openai --from v3.28.0 --to v4.0.0 --create-pr --repo owner/repo
+```
+
+---
+
+## 4. Interactive Coding Agents & Sandboxed Governance
+
+Run terminal coding agents inside a kernel-enforced sandbox with full native TUI fidelity:
+
+```bash
+# Launch Claude Code, OpenCode, Codex, Cursor, or Aider directly:
+compart claude
+
+# When the agent finishes:
+compart diff    # Review what the agent changed
+compart undo    # Instantly restore files if the agent made a mistake
+compart commit  # Commit to Git with verified provenance trailers
 ```
 
 ---
 
 ## 5. Key Guarantees
 
+- **External Intelligence**: Full-codebase AST mapping of providers, contracts, wrappers, and callsites.
+- **Continuous Maintenance**: Surgical AST patching with local formatter matching and automated Developer Trust PRs.
 - **Kernel Enforcement**: Built on native OS isolation (macOS Seatbelt / Linux Landlock).
-- **External Intelligence**: AST-level tracking of providers, contracts, wrappers, and callsites.
 - **Credential Protection**: `~/.ssh`, `~/.aws`, `~/.config/gcloud`, git credentials, and keychains are denied by default.
 - **Instant Rollback**: Hash-based BLAKE3 file snapshots allow physical restoration of modified and deleted files in 2ms.
 - **Zero Infrastructure**: No Docker, no daemon, no cloud account required.

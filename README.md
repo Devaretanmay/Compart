@@ -2,184 +2,210 @@
 
 # Compart
 
-### Git blame for agents.
+### External-change intelligence for codebases.
 
-**Compart records what your AI coding agents actually did, stamps every commit with proof of who wrote it, and hands you an undo button for when they go rogue.**
+**Greptile understands changes humans make to software. Compart understands changes the outside world makes to software.**
 
-[PyPI Package](https://pypi.org/project/compart/) | [Quickstart](docs/QUICKSTART.md) | [Trailer Spec](SPEC.md)
+[PyPI Package](https://pypi.org/project/compart/) | [Quickstart](docs/QUICKSTART.md) | [CLI Reference](docs/CLI.md) | [Benchmark Evidence](docs/benchmarks/HISTORICAL_REPLAY.md)
 
 <br/>
 
 ```text
-   agents write the code.
-    compart keeps the receipts.
+   APIs drift. SDKs break.
+   Compart keeps your codebase continuously updated and verified.
 ```
 
 </div>
 
 ---
 
-## The problem
+## The Problem
 
-You gave an agent access to your repo. Then came the questions nobody can answer:
+Software changes in two ways:
+1. **Internal changes**: Features and fixes written by your team (handled by code review and CI).
+2. **External changes**: Upstream API contract drift, major SDK breaking bumps, deprecated endpoints, and security migrations.
 
-- *Which of these commits were written by Claude, and which by a human?*
-- *Did the agent read `.env`, `~/.aws`, or your SSH keys while it worked?*
-- *The last run wrecked 40 files. What's the fastest way back?*
+Dependabot bumps version strings in lockfiles and leaves CI broken. Human engineers spend 20%+ of engineering cycles reading migration guides, mapping AST callsites, updating wrappers, and fixing broken tests.
 
-`git log` has no idea. `git blame` shrugs. Your security team keeps asking.
-
-Compart answers all three - locally, in milliseconds, with zero infrastructure.
-
-## How it works
-
-```bash
-cd my-project
-compart init          # one file, one directory. that's the whole setup.
-
-compart claude        # run any agent: claude, codex, cursor, aider, opencode
-compart exec -- pytest tests/
-
-compart diff          # exactly what changed, isolated per execution
-compart apply         # keep the good parts
-compart undo          # physically roll back the rest in 2ms
-compart commit -m "Add auth module"
-```
-
-That last command is the point. Every `compart commit` lands in git with
-machine-readable provenance trailers - which agent ran, under which execution,
-with what security verdict. Anyone can verify it later with plain git. No
-server, no dashboard, no vendor lock-in.
-
-```text
-Agent-Origin: agent
-Agent-Agent: claude-code
-Agent-Execution: exec_7a9f12bc
-Agent-Compartment: builder
-Agent-Sandbox: clean
-```
-
-Open standard, spec'd in [SPEC.md](SPEC.md). Other tools can write the same trailers - we'd like that.
+**Compart manages software changes originating outside the repository** — mapping external contracts to internal callsites, synthesizing surgical AST patches, running local formatters, and verifying zero blast radius with sandbox isolation.
 
 ---
 
-## What ships in the box
+## The 3 Pillars of Compart
 
 ```text
 ┌───────────────────────────┬───────────────────────────┬──────────────────────────────┐
-│ 1. Provenance Trailers    │ 2. 2ms Undo Engine        │ 3. External-Change Graph     │
-│    Audit-grade git trail  │    BLAKE3 physical revert │    API drift & callsite map  │
+│ 1. Day-0 Risk Register    │ 2. External-Change Graph  │ 3. Autonomous AutoPatch      │
+│    `compart audit`        │    `compart graph`        │    `compart maintain`        │
 ├───────────────────────────┼───────────────────────────┼──────────────────────────────┤
-│ 4. Autonomous Maintenance │ 5. Kernel Sandbox         │ 6. Token Compression         │
-│    Surgical AST auto-fix  │    Seatbelt / Landlock    │    Rust engines, 40-70% less │
+│ 4. Audited Git Replay     │ 5. Developer Trust PRs    │ 6. Sandboxed Verification    │
+│    `compart reproduce`    │    Verified evidence diff │    Kernel-isolated execution │
 └───────────────────────────┴───────────────────────────┴──────────────────────────────┘
 ```
 
-### 1. Provenance trailers
-RFC-5322 metadata attached to every agent-authored commit: agent identity,
-execution ID, compartment, security verdict. Turns "I think the AI wrote this"
-into an auditable fact. Built for compliance reviews, incident response, and
-the day someone asks you to prove your codebase is human-supervised.
+---
 
-### 2. Physical undo, 2 milliseconds
-Before every agent run, Compart snapshots the workspace with BLAKE3 hashes.
-`compart undo` restores modified files, removes generated ones, and leaves your
-untracked human work alone. Faster than you can switch windows. No cloud
-snapshots, no container rebuilds.
+## 1. Day-0 Risk Register (`compart audit`)
 
-### 3. External-Change Dependency Graph (`compart audit` & `compart graph`)
-Compart models the external dependencies outside your repository:
-provider → version → API contract → repository dependency → wrapper → callsite → migration history.
-`compart audit` provides a Day-0 risk register classifying at-risk, deprecated, and auto-repairable callsites.
+When you run Compart on any repository, it immediately answers:
+- *What external APIs and SDKs does this codebase depend on?*
+- *Which integrations are deprecated, behind, or at risk?*
+- *Which breaking changes can Compart already auto-repair?*
 
 ```bash
-compart audit .                         # Terminal risk register
-compart audit . --format=github-issue   # Export issue markdown
-compart graph .                         # Inspect graph topology
+compart audit .
 ```
 
-### 4. Autonomous Continuous Maintenance (`compart maintain`)
-When upstream SDKs and APIs release breaking changes, Compart detects the drift,
-synthesizes surgical AST patches, formats them with your local tools (`prettier`/`ruff`),
-verifies existing tests, and produces a Developer Trust PR with zero blast radius.
+```text
+================================================================================
+         COMPART: EXTERNAL-CHANGE DEPENDENCY AUDIT & RISK REGISTER
+================================================================================
+Total External Providers Detected: 3
+Total AST Callsites Mapped:        14
+Auto-Repairable Callsites:         6
+--------------------------------------------------------------------------------
+🔴 AT RISK (Action Required):
+  • Stripe (stripe@v21.0.0 -> v22.0.0)
+    - Status: Breaking parameter mutation detected (amount: number -> string)
+    - 4 callsites affected (4 auto-repairable by Compart)
+
+🟡 WATCHLIST (Deprecated / Pending Retirement):
+  • OpenAI (openai@v3.28.0)
+    - Status: Deprecated client interface (v4 migration available)
+    - 6 callsites affected
+
+🟢 HEALTHY:
+  • Anthropic (@anthropic-ai/sdk@v0.25.0)
+    - Status: Up-to-date with active provider contract (4 callsites mapped)
+================================================================================
+```
+
+Export directly to GitHub Issues or JSON:
+```bash
+compart audit . --format=github-issue   # Formatted markdown table for GitHub Issues
+compart audit . --format=json           # Machine-readable risk register
+```
+
+---
+
+## 2. External-Change Dependency Graph (`compart graph`)
+
+Compart builds a unified dependency graph linking:
+`Provider → Version → API Contract → Manifest Dependency → Wrapper Client → AST Callsite → Migration History`
 
 ```bash
+compart graph .
+```
+
+```text
+================================================================================
+                 COMPART: EXTERNAL-CHANGE DEPENDENCY GRAPH                     
+================================================================================
+Repository:              /path/to/my-repo
+Providers Ingested:      3
+Contracts Modeled:       6
+Manifest Dependencies:   4
+Wrapper Clients Found:   2
+AST Callsites Mapped:    14
+Active Graph Edges:      28
+================================================================================
+  [Wrapper] src/lib/stripe.ts -> wraps stripe
+  [Callsite] src/billing.ts:12 -> stripe.charges.create
+  [Callsite] src/checkout.ts:45 -> stripe.paymentIntents.create
+================================================================================
+```
+
+---
+
+## 3. Autonomous Continuous Maintenance (`compart maintain`)
+
+When upstream providers release breaking changes, Compart detects the drift, synthesizes surgical AST transformations, matches your team's code formatting (`prettier`/`ruff`), validates local tests, and opens a Developer Trust PR:
+
+```bash
+# Autonomous migration for a target provider:
 compart maintain . --provider stripe
-compart maintain . --provider openai --from v3.28.0 --to v4.0.0
+
+# Custom version bump:
+compart maintain . --provider openai --from v3.28.0 --to v4.0.0 --create-pr --repo owner/repo
 ```
 
-### 5. Kernel-level sandbox
-Process isolation enforced by the OS itself - macOS Seatbelt, Linux Landlock.
-Deny-by-default filesystem scoping, per-compartment network gating, and
-confinement inherited by every child process the agent spawns. Not a wrapper
-around `exec()`. Not vibes.
+### What `compart maintain` guarantees:
+1. **Surgical AST Patching**: Only transforms affected callsites and wrappers.
+2. **Local Formatter Bridge**: Formats changed files with your project's `prettier`, `ruff`, or `biome`.
+3. **Local Test Verification**: Executes test suites and rejects patches if tests remain red.
+4. **Zero Blast Radius**: Verifies that 0 unintended files were modified.
+5. **Developer Trust PR**: Generates audit-grade PR markdown containing primary sources, exact callsites, test receipts, and rollback hashes.
 
-### 6. Token compression engines
-Four Rust engines crush terminal noise before it eats your context window:
-SmartCrusher (structured JSON), LogCompressor (stack traces over progress
-bars), DiffCompressor (multi-file diffs), TextCrusher (extractive summaries).
-40-70% token savings on typical agent output. Your API bill will notice.
+---
+
+## 4. Audited Ground-Truth Replay Protocol (`compart reproduce`)
+
+Compart has been benchmarked against real-world production repositories that underwent breaking migrations (LangChain, Cal.com, Taxonomy, AWS SDK, Supabase, Clerk, etc.):
+
+```bash
+# Replay 10 clinical benchmark cases:
+compart reproduce all
+
+# Replay 3 full-repo Git history cases:
+compart reproduce --git
+```
+
+```text
+================================================================================
+                 FULL-REPO GIT REPLAY VERIFICATION SUMMARY                      
+================================================================================
+Total Full-Repo Git Cases Evaluated: 3
+  - Autonomous Test Repairs:          3 / 3 (100.0%)
+  - Lockfile & Version Verified:      3 / 3 (100.0%)
+  - Blast Radius Containment:         3 / 3 (100.0%)
+  - Semantic Diff Equivalence:        Average 100.0%
+  - Causal Reproducibility:           3 / 3 (100.0%)
+================================================================================
+```
+
+---
+
+## 5. Kernel-Sandboxed Execution & Agent Governance
+
+Compart incorporates OS kernel sandboxing (macOS Seatbelt, Linux Landlock) and 2ms physical rollback for agent workflows and autonomous test runs:
+
+```bash
+compart init                          # Initialize workspace control plane
+compart claude                        # Run coding agents in kernel-governed sandbox
+compart diff                          # Inspect isolated execution change sets
+compart undo                          # Instant 2ms physical rollback
+compart commit -m "Update Stripe v22" # Embed RFC-5322 Agent Provenance Trailers
+```
 
 ---
 
 ## Python SDK
 
-Drop Compart into LangGraph, CrewAI, AutoGen, or whatever pipeline you're
-running this week:
-
 ```python
-from compart import Compart, Compartment, CompartmentConfig
+from compart.graph import build_dependency_graph, audit_dependency_graph
+from compart.maintenance import run_maintenance_cycle
 
-box = Compart(workdir=".")
+# 1. Audit repository external dependencies
+summary = audit_dependency_graph(repo_root=".")
+print(f"At Risk: {len(summary['at_risk'])}, Auto-Repairable: {summary['total_auto_repairable']}")
 
-box.add(Compartment(
-    name="researcher",
-    fn=lambda ctx: print("Fetching external docs..."),
-    config=CompartmentConfig(permissions=["fs_read", "network"]),
-))
-
-box.add(Compartment(
-    name="builder",
-    fn=lambda ctx: print("Writing code. Zero exfiltration."),
-    config=CompartmentConfig(permissions=["fs_read", "fs_write", "fs_exec"]),
-))
-
-box.edge("researcher", "builder")
-result = box.run()
-print(f"{result.status} in {result.elapsed_s}s")
+# 2. Run autonomous maintenance cycle
+report = run_maintenance_cycle(
+    repo_dir=".",
+    provider_name="stripe",
+    create_pr=False,
+)
+print(f"Maintenance Outcome: {'GREEN' if report.success else 'REFUSED'}")
+print(report.unified_diff)
 ```
-
-| Framework | Pattern | Docs |
-| :--- | :--- | :--- |
-| **LangGraph / LangChain** | `@compart_tool` sandboxed decorator | [Framework Hooks](docs/FRAMEWORK_HOOKS.md) |
-| **CrewAI** | Isolated `CompartTask` tool | [Framework Hooks](docs/FRAMEWORK_HOOKS.md#crewai) |
-| **AutoGen** | Sandboxed code-exec container | [Framework Hooks](docs/FRAMEWORK_HOOKS.md#autogen) |
-| **OpenHands / SWE-bench** | Zero-latency local backend | [Use Cases](docs/USE_CASES.md) |
-
----
-
-## Why not just Docker?
-
-| | Compart | Docker | Cloud microVMs (E2B etc.) | Raw host process |
-| :--- | :---: | :---: | :---: | :---: |
-| Startup overhead | **< 1 ms** | 2,000-10,000 ms | 1,000-5,000 ms | 0 ms |
-| Setup | **one command** | Dockerfiles, daemon | cloud account, billing | none |
-| Secrets blocked by default | **yes, kernel-enforced** | manual mounts | remote | lol no |
-| Physical undo | **2 ms** | recreate container | VM snapshot | `git reset --hard` (good luck) |
-| Agent provenance in git | **yes** | no | no | no |
-| Code stays on your machine | **always** | yes | no | yes |
 
 ---
 
 ## Documentation
 
-[Quickstart](docs/QUICKSTART.md) · [CLI Reference](docs/CLI.md) · [Agent Execution](docs/AGENT_EXECUTION.md) · [Credential Proxy](docs/CREDENTIAL_PROXY.md) · [Snapshots & Rollback](docs/SNAPSHOTS.md) · [Compression](docs/COMPRESSION.md) · [API Reference](docs/API_REFERENCE.md) · [Security Use Cases](docs/USE_CASES.md) · [Trailer Spec](SPEC.md)
-
-## Contributing
-
-PRs welcome - read [CONTRIBUTING.md](CONTRIBUTING.md) and [CLA.md](CLA.md) first.
-Found a sandbox escape? That's a [security report](SECURITY.md), not an issue.
+[Quickstart Guide](docs/QUICKSTART.md) · [CLI Reference](docs/CLI.md) · [Historical Replay Benchmarks](docs/benchmarks/HISTORICAL_REPLAY.md) · [API Reference](docs/API_REFERENCE.md) · [Agent Governance & Trailers](SPEC.md)
 
 ## License
 
-Apache-2.0. Fork it, embed it, ship it - just don't use our name to sell your fork.
+Apache-2.0. Copyright 2026 Compart Authors.
+
