@@ -77,4 +77,10 @@ Low-level process execution runner that applies kernel sandbox (Seatbelt / Landl
 - `detect_drift(repo_dir: str, provider_name: str) -> List[Dict[str, Any]]`: Scans for outdated external dependencies.
 - `run_maintenance_cycle(repo_dir: str, provider_name: str, ...) -> MaintenanceReport`: Runs end-to-end drift detection, AST patching, formatting, test verification, and PR creation.
 
-- `run_code(code: str, language="python", permissions=None, env=None) -> ExecutionResult`
+### `from compart.maintenance_agents import AutonomousMaintenancePipeline, ChangeAnalyzer, ImpactAnalyst, PatchPlanner, PatchVerifier`
+- `ChangeAnalyzer`: Analyzes vendor OpenAPI/SDK breaking contracts.
+- `ImpactAnalyst`: Traces dependencies through wrappers to affected callsites.
+- `PatchPlanner`: Synthesizes AST transformation plans.
+- `PatchVerifier`: Runs sandboxed tests, compresses execution evidence logs, checks zero blast radius, and certifies merge readiness.
+- `AutonomousMaintenancePipeline`: Coordinates the 4 specialized maintenance agents end-to-end.
+
