@@ -27,20 +27,11 @@ const DEFAULT_EXCLUDE: &[&str] = &[
     ".next",
 ];
 
-const CHUNK: usize = 65_536;
-
 // blake3 hash, hex-truncated to 16 chars (matches Python manifest format).
 fn file_hash(path: &Path) -> std::io::Result<String> {
     let mut hasher = blake3::Hasher::new();
-    let mut buf = vec![0u8; CHUNK];
     let mut file = fs::File::open(path)?;
-    loop {
-        let n = std::io::Read::read(&mut file, &mut buf)?;
-        if n == 0 {
-            break;
-        }
-        hasher.update(&buf[..n]);
-    }
+    hasher.update_reader(&mut file)?;
     let hex = hasher.finalize().to_hex();
     Ok(hex[..16].to_string())
 }

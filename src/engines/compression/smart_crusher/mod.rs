@@ -14,11 +14,7 @@ mod statistics;
 mod stats_math;
 mod types;
 
-
-
 pub use crusher::SmartCrusher;
-
-
 
 use std::collections::BTreeSet;
 
@@ -251,4 +247,3 @@ mod config_tests {
         assert_eq!(c.preview_count, 0);
     }
 }
-

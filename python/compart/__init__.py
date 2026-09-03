@@ -3,6 +3,7 @@ from .compartments import Compartment, CompartmentConfig
 
 from . import compartments as compartments
 from . import hooks as hooks
+from . import autopatch as autopatch
 
 try:
     from importlib.metadata import version as _package_version
@@ -19,5 +20,6 @@ __all__ = [
     "CompartmentConfig",
     "compartments",
     "hooks",
+    "autopatch",
 ]
 

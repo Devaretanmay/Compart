@@ -11,13 +11,13 @@ use super::orchestration::prioritize_indices;
 use super::types::{ArrayAnalysis, CompressionPlan, CompressionStrategy, FieldStats};
 use super::SmartCrusherConfig;
 use crate::engines::compression::anchor_selector::{AnchorSelector, DataPattern};
-use crate::engines::compression::bm25::RelevanceScorer;
+use crate::engines::compression::bm25::BM25Scorer;
 
 #[allow(dead_code)]
 pub struct SmartCrusherPlanner<'a> {
     pub config: &'a SmartCrusherConfig,
     pub anchor_selector: &'a AnchorSelector,
-    pub scorer: &'a (dyn RelevanceScorer + Send + Sync),
+    pub scorer: &'a BM25Scorer,
     pub analyzer: &'a SmartAnalyzer,
 }
 
@@ -25,7 +25,7 @@ impl<'a> SmartCrusherPlanner<'a> {
     pub fn new(
         config: &'a SmartCrusherConfig,
         anchor_selector: &'a AnchorSelector,
-        scorer: &'a (dyn RelevanceScorer + Send + Sync),
+        scorer: &'a BM25Scorer,
         analyzer: &'a SmartAnalyzer,
     ) -> Self {
         SmartCrusherPlanner {

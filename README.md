@@ -67,11 +67,11 @@ Open standard, spec'd in [SPEC.md](SPEC.md). Other tools can write the same trai
 
 ```text
 ┌───────────────────────────┬───────────────────────────┬──────────────────────────────┐
-│ 1. Provenance Trailers    │ 2. 2ms Undo Engine        │ 3. Multi-Agent Pipelines     │
-│    Audit-grade git trail  │    BLAKE3 physical revert │    DAGs across any agents    │
+│ 1. Provenance Trailers    │ 2. 2ms Undo Engine        │ 3. External-Change Graph     │
+│    Audit-grade git trail  │    BLAKE3 physical revert │    API drift & callsite map  │
 ├───────────────────────────┼───────────────────────────┼──────────────────────────────┤
-│ 4. Kernel Sandbox         │ 5. Credential Defense     │ 6. Token Compression         │
-│    Seatbelt / Landlock    │    Secrets stay sealed    │    Rust engines, 40-70% less │
+│ 4. Autonomous Maintenance │ 5. Kernel Sandbox         │ 6. Token Compression         │
+│    Surgical AST auto-fix  │    Seatbelt / Landlock    │    Rust engines, 40-70% less │
 └───────────────────────────┴───────────────────────────┴──────────────────────────────┘
 ```
 
@@ -87,31 +87,32 @@ Before every agent run, Compart snapshots the workspace with BLAKE3 hashes.
 untracked human work alone. Faster than you can switch windows. No cloud
 snapshots, no container rebuilds.
 
-### 3. Multi-agent pipelines
-Chain specialized steps into dependency-aware DAGs - a research step with
-network access, a build step without, a test step read-only - then execute the
-whole graph topologically. Failed upstream steps skip their dependents;
-independent branches keep running.
+### 3. External-Change Dependency Graph (`compart audit` & `compart graph`)
+Compart models the external dependencies outside your repository:
+provider → version → API contract → repository dependency → wrapper → callsite → migration history.
+`compart audit` provides a Day-0 risk register classifying at-risk, deprecated, and auto-repairable callsites.
 
 ```bash
-compart -w vuln-scan
-compart step vuln-scan src/fetch_cve.py --compartment research
-compart step vuln-scan src/patch.py      --compartment builder
-compart step vuln-scan "pytest tests/"   --compartment tester
-compart --run vuln-scan
+compart audit .                         # Terminal risk register
+compart audit . --format=github-issue   # Export issue markdown
+compart graph .                         # Inspect graph topology
 ```
 
-### 4. Kernel-level sandbox
+### 4. Autonomous Continuous Maintenance (`compart maintain`)
+When upstream SDKs and APIs release breaking changes, Compart detects the drift,
+synthesizes surgical AST patches, formats them with your local tools (`prettier`/`ruff`),
+verifies existing tests, and produces a Developer Trust PR with zero blast radius.
+
+```bash
+compart maintain . --provider stripe
+compart maintain . --provider openai --from v3.28.0 --to v4.0.0
+```
+
+### 5. Kernel-level sandbox
 Process isolation enforced by the OS itself - macOS Seatbelt, Linux Landlock.
 Deny-by-default filesystem scoping, per-compartment network gating, and
 confinement inherited by every child process the agent spawns. Not a wrapper
 around `exec()`. Not vibes.
-
-### 5. Credential defense
-`~/.ssh`, `~/.aws`, `~/.config/gcloud`, keychains, browser profiles, git
-credentials - denied at the kernel boundary before the agent ever starts. An
-optional local proxy injects API secrets into outbound calls without the raw
-keys ever entering the agent's context.
 
 ### 6. Token compression engines
 Four Rust engines crush terminal noise before it eats your context window:

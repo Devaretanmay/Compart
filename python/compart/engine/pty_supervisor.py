@@ -24,6 +24,11 @@ Non-interactive (output capture for workflows/scripts)::
 
 from __future__ import annotations
 
+try:
+    from compart._core import sandbox_apply as _core_sandbox_apply
+except ImportError:
+    _core_sandbox_apply = None
+
 import errno
 import fcntl
 import logging
@@ -38,11 +43,6 @@ import termios
 import tty
 from dataclasses import dataclass, field
 from typing import Optional, Sequence
-
-try:
-    from compart._core import sandbox_apply as _core_sandbox_apply
-except ImportError:
-    _core_sandbox_apply = None
 
 _logger = logging.getLogger("compart.pty_supervisor")
 

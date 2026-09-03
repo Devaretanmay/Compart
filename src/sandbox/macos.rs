@@ -237,4 +237,3 @@ mod tests {
         assert!(escape_path("/tmp/\\test").contains('\\'));
     }
 }
-

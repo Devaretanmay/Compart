@@ -82,9 +82,9 @@ class CompartCIRunner:
         }
 
 
-def run_ci_step(cmd: str, block_network: bool = True, sandbox: bool = True) -> int:
+def run_ci_step(cmd: str, block_network: bool = True, sandbox: bool = True, timeout_s: int = 600) -> int:
     """Convenience helper to run a CI step and output directly to stdout/stderr."""
-    runner = CompartCIRunner(block_network=block_network, sandbox=sandbox)
+    runner = CompartCIRunner(block_network=block_network, sandbox=sandbox, timeout_s=timeout_s)
     res = runner.run_step(cmd)
     
     if res["stdout"]:
@@ -117,7 +117,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     args = parser.parse_args(argv)
     block_net = not args.allow_network
-    return run_ci_step(args.cmd, block_network=block_net)
+    return run_ci_step(args.cmd, block_network=block_net, timeout_s=args.timeout)
 
 
 if __name__ == "__main__":

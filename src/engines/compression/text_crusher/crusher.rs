@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 
 use super::config::TextCrusherConfig;
-use crate::engines::compression::bm25::{BM25Scorer, RelevanceScorer};
+use crate::engines::compression::bm25::BM25Scorer;
 
 const KEYWORDS: [&str; 10] = [
     "error",

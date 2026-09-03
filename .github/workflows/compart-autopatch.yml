@@ -1,0 +1,67 @@
+name: Compart AutoPatch - Autonomous API Maintenance
+
+on:
+  schedule:
+    # Run nightly at 03:00 UTC to detect upstream API drifts
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      old_spec:
+        description: 'Path or URL to old OpenAPI spec'
+        required: true
+        default: 'specs/stripe_old.json'
+      new_spec:
+        description: 'Path or URL to new OpenAPI spec'
+        required: true
+        default: 'specs/stripe_new.json'
+
+jobs:
+  autopatch:
+    name: Detect API Drift & Generate Verified Maintenance PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Compart
+        run: |
+          pip install --upgrade compart
+
+      - name: Run Compart AutoPatch
+        id: autopatch
+        run: |
+          mkdir -p .autopatch_output
+          compart autopatch \
+            --old "${{ inputs.old_spec || 'specs/api_old.json' }}" \
+            --new "${{ inputs.new_spec || 'specs/api_new.json' }}" \
+            --root-dir . \
+            --lang typescript \
+            --out-dir .autopatch_output
+
+      - name: Check for Required Maintenance
+        id: check_changes
+        run: |
+          if [ -f ".autopatch_output/AUTOPATCH_REPORT.md" ]; then
+            echo "has_patch=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_patch=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request with Verified AutoPatch
+        if: steps.check_changes.outputs.has_patch == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore(api): autonomous API drift patch [skip ci]"
+          branch: "autopatch/api-maintenance"
+          title: "[AutoPatch] Upstream API Drift Maintenance & Verified Contracts"
+          body-path: ".autopatch_output/AUTOPATCH_REPORT.md"
+          labels: "autopatch,maintenance,automated"

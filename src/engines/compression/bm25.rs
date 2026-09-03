@@ -1,9 +1,5 @@
 use std::collections::HashMap;
 
-pub trait RelevanceScorer {
-    fn score_batch(&self, items: &[&str], context: Option<&str>) -> Vec<f64>;
-}
-
 #[derive(Debug, Clone)]
 pub struct BM25Scorer {
     avg_doc_len: f64,
@@ -22,23 +18,20 @@ impl Default for BM25Scorer {
 }
 
 impl BM25Scorer {
-    fn compute_bm25(&self, term_freq: f64, doc_len: f64, idf: f64) -> f64 {
+    pub fn compute_bm25(&self, term_freq: f64, doc_len: f64, idf: f64) -> f64 {
         let numerator = term_freq * (self.k1 + 1.0);
-        let denominator =
-            term_freq + self.k1 * (1.0 - self.b + self.b * doc_len / self.avg_doc_len);
+        let denominator = term_freq + self.k1 * (1.0 - self.b + self.b * doc_len / self.avg_doc_len);
         idf * numerator / denominator
     }
 
-    fn compute_idf(&self, n: f64, total: f64) -> f64 {
+    pub fn compute_idf(&self, n: f64, total: f64) -> f64 {
         if total <= 0.0 || n <= 0.0 {
             return 0.0;
         }
         ((total - n + 0.5) / (n + 0.5) + 1.0).ln()
     }
-}
 
-impl RelevanceScorer for BM25Scorer {
-    fn score_batch(&self, items: &[&str], context: Option<&str>) -> Vec<f64> {
+    pub fn score_batch(&self, items: &[&str], context: Option<&str>) -> Vec<f64> {
         let query = match context {
             Some(q) if !q.is_empty() => q.to_lowercase(),
             _ => return vec![0.5; items.len()],
@@ -58,7 +51,7 @@ impl RelevanceScorer for BM25Scorer {
             doc_freqs.insert(*term, count);
         }
 
-        let scores: Vec<f64> = items_lower
+        items_lower
             .iter()
             .map(|doc| {
                 let doc_len = doc.len() as f64;
@@ -73,8 +66,6 @@ impl RelevanceScorer for BM25Scorer {
                 }
                 (score / (score + 1.0)).min(1.0)
             })
-            .collect();
-
-        scores
+            .collect()
     }
 }

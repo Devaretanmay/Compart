@@ -1,6 +1,6 @@
 pub mod sandbox;
 
-mod engines;
+pub mod engines;
 pub mod runtime;
 
 #[cfg(feature = "pyo3-binding")]
@@ -13,4 +13,3 @@ pub fn version() -> &'static str {
 pub fn compress(content: &str) -> String {
     engines::compression::route_and_compress(content)
 }
-

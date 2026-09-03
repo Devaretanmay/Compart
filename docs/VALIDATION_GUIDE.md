@@ -1,10 +1,10 @@
 # Product Validation Guide: Testing Compart with Your AI Agents
 
-This guide provides a 60-second test suite for validating Compart as the control layer for your AI agents and workflows.
+This guide provides a quick test suite for validating Compart as the audit and control layer for your AI agents and codebase dependencies.
 
 ---
 
-## The 3 Validation Scenarios
+## The Core Validation Model
 
 ```text
 WITHOUT COMPART
@@ -21,45 +21,52 @@ Agent -> COMPART (Topology, Policies, Proxy, Snapshots) -> OS (Kernel Enforced)
 Validate that an AI agent reading your repo and executing bash commands is blocked from reading `~/.ssh` or `~/.aws` credentials while executing workspace tasks cleanly.
 
 ```bash
-python3 examples/validation/1_claude_code_cli_agent.py
+compart claude
+# or arbitrary command execution:
+compart exec -- cat ~/.ssh/id_rsa
 ```
 
 ### What You Observe:
 - Host SSH credential access is blocked by the OS kernel.
 - Workspace file modifications are tracked with BLAKE3 file diffs.
+- `compart diff` isolates agent modifications.
+- `compart undo` restores workspace state in 2ms.
 
 ---
 
-## 2. Test Scenario 2: Multi-Agent Workflow (LangGraph / CrewAI)
+## 2. Test Scenario 2: Day-0 External Dependency Audit & Risk Register
 
-Validate multi-compartment permission routing where a Research Agent has read-only access and a Builder Agent has write access.
+Audit your entire codebase for upstream breaking changes, deprecated API callsites, and auto-repairable integrations.
 
 ```bash
-python3 examples/validation/2_langgraph_crewai_workflow.py
+compart audit .
+compart audit . --format=github-issue
 ```
 
 ### What You Observe:
-- Inter-compartment communication flows only along authorized edges.
-- Read-only agent compartments cannot write or modify workspace files.
+- AST parser maps all external SDK and API callsites across TypeScript, Python, and Go.
+- Categorizes dependencies into At-Risk, Watchlist, and Healthy.
+- Generates formatted risk register markdown ready for GitHub Issues.
 
 ---
 
-## 3. Test Scenario 3: Custom Agent & MCP Tools (Credential Proxy)
+## 3. Test Scenario 3: Autonomous Continuous Maintenance Loop
 
-Validate in-memory secret proxying for outbound API calls without exposing raw API keys to agent code or LLM prompts.
+Detect upstream API drift and synthesize verified AST patches against breaking changes.
 
 ```bash
-python3 examples/validation/3_mcp_tools_and_proxy.py
+compart maintain . --provider stripe
 ```
 
 ### What You Observe:
-- Local proxy intercepts `/openai` requests and injects Authorization headers in memory.
-- Agent environment remains isolated from raw host secrets.
+- Scans manifests and callsites against official provider contracts.
+- Generates surgical AST patch and runs local formatters (prettier/ruff).
+- Validates repository tests and blast-radius constraints before creating a Developer Trust PR.
 
 ---
 
-## The Validation Question for Testers
+## The Validation Question
 
-After running these 3 validation scenarios on your codebase, answer this single question:
+After running these validation scenarios on your codebase:
 
-> **"Would you run your agents without this?"**
+> **"Would you run your coding agents without Compart?"**

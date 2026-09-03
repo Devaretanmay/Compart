@@ -6,7 +6,7 @@ use super::analyzer::SmartAnalyzer;
 use super::classifier::{classify_array, ArrayType};
 use super::compaction::{
     classify_cell, emit_opaque_ccr_marker, try_parse_json_container, CellClass, ClassifyConfig,
-    CompactConfig, Compaction, CompactionStage,
+    CompactConfig, Compaction, CompactionStage, OpaqueKind,
 };
 use super::SmartCrusherConfig;
 
@@ -17,7 +17,7 @@ use super::types::{CompressionPlan, CompressionStrategy, CrushResult};
 use crate::engines::compression::adaptive_sizer::compute_optimal_k;
 use crate::engines::compression::anchor_selector::AnchorConfig;
 use crate::engines::compression::anchor_selector::AnchorSelector;
-use crate::engines::compression::bm25::{BM25Scorer, RelevanceScorer};
+use crate::engines::compression::bm25::BM25Scorer;
 use crate::runtime::ccr::InMemoryCcrStore;
 
 #[allow(dead_code)]
@@ -33,7 +33,7 @@ pub struct CrushArrayResult {
 pub struct SmartCrusher {
     pub config: SmartCrusherConfig,
     pub anchor_selector: AnchorSelector,
-    pub scorer: Box<dyn RelevanceScorer + Send + Sync>,
+    pub scorer: BM25Scorer,
     pub analyzer: SmartAnalyzer,
 
     pub compaction: Option<CompactionStage>,
@@ -55,7 +55,7 @@ impl SmartCrusher {
             ..CompactConfig::default()
         };
         let anchor_selector = AnchorSelector::new(AnchorConfig::default());
-        let scorer = Box::<BM25Scorer>::default();
+        let scorer = BM25Scorer::default();
         let analyzer = SmartAnalyzer::new(config.clone());
         let compaction = Some(CompactionStage::csv_schema(compact_cfg));
         let ccr_store: Option<Arc<InMemoryCcrStore>> = Some(Arc::new(InMemoryCcrStore::new()));
@@ -72,7 +72,7 @@ impl SmartCrusher {
     #[allow(dead_code)]
     pub fn without_compaction(config: SmartCrusherConfig) -> Self {
         let anchor_selector = AnchorSelector::new(AnchorConfig::default());
-        let scorer = Box::<BM25Scorer>::default();
+        let scorer = BM25Scorer::default();
         let analyzer = SmartAnalyzer::new(config.clone());
         let ccr_store: Option<Arc<InMemoryCcrStore>> = Some(Arc::new(InMemoryCcrStore::new()));
         SmartCrusher {
@@ -88,7 +88,7 @@ impl SmartCrusher {
     #[allow(dead_code)]
     pub fn with_scorer(
         config: SmartCrusherConfig,
-        scorer: Box<dyn RelevanceScorer + Send + Sync>,
+        scorer: BM25Scorer,
     ) -> Self {
         let anchor_selector = AnchorSelector::new(AnchorConfig::default());
         let analyzer = SmartAnalyzer::new(config.clone());
@@ -112,7 +112,7 @@ impl SmartCrusher {
         SmartCrusherPlanner::new(
             &self.config,
             &self.anchor_selector,
-            &*self.scorer,
+            &self.scorer,
             &self.analyzer,
         )
     }
@@ -652,8 +652,7 @@ fn hash_canonical(canonical: &str) -> String {
     h.to_hex().as_str()[..12].to_string()
 }
 
-fn opaque_kind_label(kind: &super::compaction::OpaqueKind) -> &str {
-    use super::compaction::OpaqueKind;
+fn opaque_kind_label(kind: &OpaqueKind) -> &str {
     match kind {
         OpaqueKind::Base64Blob => "base64",
         OpaqueKind::LongString => "string",
@@ -954,7 +953,7 @@ mod tests {
         use crate::engines::compression::bm25::BM25Scorer;
         let c = SmartCrusher::with_scorer(
             SmartCrusherConfig::default(),
-            Box::new(BM25Scorer::default()),
+            BM25Scorer::default(),
         );
         let items: Vec<Value> = (0..30).map(|_| json!({"status": "ok"})).collect();
         let result = c.crush_array(&items, "anything", 1.0);

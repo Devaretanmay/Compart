@@ -2,6 +2,7 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::field_detect::{detect_id_field_statistically, detect_score_field_statistically};
+use super::outliers::{detect_error_items_for_preservation, detect_structural_outliers};
 use super::stats_math::{mean, sample_stdev, sample_variance};
 use super::types::{ArrayAnalysis, CompressionStrategy, CrushabilityAnalysis, FieldStats};
 use super::SmartCrusherConfig;
@@ -318,8 +319,6 @@ impl SmartAnalyzer {
         items: &[Value],
         field_stats: &BTreeMap<String, FieldStats>,
     ) -> CrushabilityAnalysis {
-        use super::outliers::{detect_error_items_for_preservation, detect_structural_outliers};
-
         let mut signals_present: Vec<String> = Vec::new();
 
         let mut id_field_name: Option<String> = None;
