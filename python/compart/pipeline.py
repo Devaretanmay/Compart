@@ -626,7 +626,7 @@ def verify_fixes(
     test_exit_code = 0
     test_duration_ms = 1
 
-    if test_cmd not in ("exit 0", "") and not test_cmd.startswith("node test/"):
+    if test_cmd:
         test_start = time.time()
         try:
             proc = _run_tests(ctx.workdir, test_cmd, timeout=120)
@@ -667,6 +667,12 @@ def generate_evidence(
     lockfile_hash = hashlib.blake2b(b"lockfile_data", digest_size=8).hexdigest()
     patch_hash = hashlib.blake2b(unified_diff.encode("utf-8"), digest_size=8).hexdigest()
 
+    impacted = []
+    for f in analysis.findings:
+        impacted.extend(f.callsites_in_context)
+    if not impacted:
+        impacted = [{"file_path": mf, "description": "Surgically patched"} for mf in analysis.modified_files]
+
     meta = TrustPRMetadata(
         provider_name=analysis.findings[0].display_name if analysis.findings else "External API",
         from_version=analysis.findings[0].current_version if analysis.findings else "v1",
@@ -677,12 +683,13 @@ def generate_evidence(
         unintended_files_modified=0,
         quarantined_callsites_count=0,
         unified_diff=unified_diff,
-        test_command=analysis.test_command or "npm test",
+        test_command=analysis.test_command,
         test_exit_code=analysis.test_exit_code,
         test_duration_ms=analysis.test_duration_ms,
         lockfile_hash=lockfile_hash,
         patch_hash=patch_hash,
         semantic_score=1.0,
+        impacted_callsites=impacted,
     )
     analysis.trust_pr_body = generate_trust_pr_markdown(meta)
     return analysis
@@ -700,7 +707,10 @@ def surface_result(
 
     if analysis.verified and analysis.modified_files:
         comment = analysis.trust_pr_body or render_verification_comment(analysis, ctx)
-        status_desc = f"Compart: autonomous repair verified ({len(analysis.modified_files)} file(s) patched, tests green)"
+        if analysis.test_command and analysis.test_exit_code == 0:
+            status_desc = f"Compart: autonomous repair verified ({len(analysis.modified_files)} file(s) patched, tests green)"
+        else:
+            status_desc = f"Compart: autonomous repair applied ({len(analysis.modified_files)} file(s) patched, test suite unconfigured)"
 
         try:
             rel_files = [os.path.relpath(f, ctx.workdir) if os.path.isabs(f) else f for f in analysis.modified_files]

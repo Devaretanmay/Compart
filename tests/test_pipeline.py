@@ -107,8 +107,8 @@ def test_surface_result_clean_when_no_findings():
     surface = surface_result(ctx, analysis, policy, client)
     assert surface.status_description == "Compart: no external contract impact detected"
     client.post_pr_comment.assert_called_once()
-    assert "COMPART VERIFICATION" in surface.comment_body
-    assert "[VERIFIED]" in surface.comment_body
+    assert "Compart checked 1 external API touchpoint(s)" in surface.comment_body
+    assert "No contract violations detected. No changes made." in surface.comment_body
 
 
 def test_surface_result_with_drift_findings():
@@ -157,6 +157,8 @@ def test_surface_result_verified_autofix():
         findings=[],
         modified_files=["/tmp/src/stripe.ts"],
         verified=True,
+        test_command="npm test",
+        test_exit_code=0,
         trust_pr_body="## Blast Radius Containment Receipt\n[VERIFIED] Autonomous Maintenance",
     )
     client = MagicMock()
@@ -169,4 +171,36 @@ def test_surface_result_verified_autofix():
 
     assert "autonomous repair verified" in surface.status_description
     assert "Blast Radius Containment Receipt" in surface.comment_body
+    client.post_pr_comment.assert_called_once()
+
+
+def test_surface_result_unconfigured_tests():
+    ctx = TriggerContext(
+        event_id="e1",
+        event_type="pull_request.opened",
+        repository="acme/repo",
+        ref="main",
+        sha="abc",
+        workdir="/tmp",
+        pr_number=10,
+    )
+    analysis = AnalysisResult(
+        context=ctx,
+        findings=[],
+        modified_files=["/tmp/src/stripe.ts"],
+        verified=True,
+        test_command="",
+        test_exit_code=0,
+        trust_pr_body="## Blast Radius Containment Receipt\n[UNVERIFIED: NO AUTOMATED TEST SUITE]",
+    )
+    client = MagicMock()
+    policy = PipelinePolicy(pr_auto_fix=True)
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "abc123456789"
+        surface = surface_result(ctx, analysis, policy, client)
+
+    assert "test suite unconfigured" in surface.status_description
+    assert "[UNVERIFIED: NO AUTOMATED TEST SUITE]" in surface.comment_body
     client.post_pr_comment.assert_called_once()

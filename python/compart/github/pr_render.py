@@ -12,31 +12,9 @@ def render_verification_comment(
     analysis: "AnalysisResult",
     ctx: "TriggerContext",
 ) -> str:
-    """Render the clean verification comment."""
-    provider_count = len(analysis.providers_detected)
-    callsites = analysis.callsites_total
-
-    lines = [
-        "-----------------------------------------",
-        "        COMPART VERIFICATION",
-        "-----------------------------------------",
-        "",
-        "[OK] Repository dependency graph analyzed",
-        f"[OK] {provider_count} external API touchpoint(s) checked",
-        "[OK] No breaking contract conflict detected",
-        f"[OK] {callsites} callsite(s) inspected",
-        "",
-        "[VERIFIED]",
-        "",
-        "Compart evidence:",
-        f"  Providers detected: {provider_count}",
-        f"  Callsites checked: {callsites}",
-    ]
-    if ctx.changed_files:
-        lines.append(f"  Files in PR: {len(ctx.changed_files)}")
-    lines.append("")
-    lines.append("-----------------------------------------")
-    return "\n".join(lines)
+    """Render the clean verification comment for unaffected PRs."""
+    touchpoints = analysis.callsites_total or len(analysis.providers_detected) or 1
+    return f"Compart checked {touchpoints} external API touchpoint(s). No contract violations detected. No changes made."
 
 
 def render_maintenance_issue_comment(

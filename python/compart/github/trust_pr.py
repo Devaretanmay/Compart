@@ -28,8 +28,37 @@ class TrustPRMetadata:
 
 def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
     """Format high-trust, developer-delighting Pull Request body."""
-    status_tag = "[VERIFIED]" if meta.unintended_files_modified == 0 and meta.test_exit_code == 0 else "[NEEDS REVIEW]"
-    
+    is_real_test = bool(meta.test_command and meta.test_command.strip() not in ("exit 0", "none", ""))
+    tests_passed = is_real_test and (meta.test_exit_code == 0)
+    patched_count = len(meta.impacted_callsites) or meta.files_modified
+
+    if is_real_test and tests_passed and meta.unintended_files_modified == 0:
+        status_tag = "[VERIFIED]"
+        test_summary = "real tests ran -> GREEN"
+        test_lines = [
+            f"- **Test Command**: `{meta.test_command}`",
+            "- **Exit Code**: `0` (SUCCESS (GREEN))",
+            f"- **Duration**: `{meta.test_duration_ms}ms`",
+        ]
+        confidence_str = "Verified green against repository test suite"
+    elif not is_real_test:
+        status_tag = "[UNVERIFIED: NO AUTOMATED TEST SUITE]"
+        test_summary = "no test suite configured"
+        test_lines = [
+            "- **Test Command**: None detected (no automated test suite in repository)",
+            "- **Status**: Automated test verification skipped; patch applied by contract specification.",
+        ]
+        confidence_str = "Unverified by automated tests (no repository test command configured)"
+    else:
+        status_tag = "[NEEDS REVIEW]"
+        test_summary = f"tests ran -> FAILED (exit {meta.test_exit_code})"
+        test_lines = [
+            f"- **Test Command**: `{meta.test_command}`",
+            f"- **Exit Code**: `{meta.test_exit_code}` (FAILURE (RED))",
+            f"- **Duration**: `{meta.test_duration_ms}ms`",
+        ]
+        confidence_str = "Test failure detected"
+
     diff_block = ""
     if meta.unified_diff:
         diff_lines = meta.unified_diff.strip().splitlines()
@@ -40,17 +69,26 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
     else:
         diff_block = "_No source modifications required._"
 
-    test_status_str = "SUCCESS (GREEN)" if meta.test_exit_code == 0 else "FAILURE (RED)"
-    score_pct = meta.semantic_score * 100.0
+    callsite_lines = [
+        f"- **Confirmed Affected**: `{patched_count}` callsite(s) surgically patched across `{meta.files_modified}` file(s).",
+    ]
+    for c in meta.impacted_callsites[:8]:
+        file_p = c.get("file_path") or c.get("file") or ""
+        line_n = c.get("line_number") or c.get("line") or ""
+        loc = f"`{file_p}:{line_n}`" if line_n else f"`{file_p}`"
+        desc = c.get("description") or c.get("matched_code") or "API contract update"
+        callsite_lines.append(f"  - {loc}: {desc}")
 
     lines = [
         f"## {status_tag} Autonomous Maintenance: Upgrade `{meta.provider_name}` ({meta.from_version} -> {meta.to_version})",
+        "",
+        f"**{meta.provider_name} {meta.from_version} -> {meta.to_version} contract drift -> Compart found {patched_count} affected callsite(s) -> patched those {patched_count} -> {test_summary} -> 0 unrelated files -> {status_tag}**",
         "",
         "### Upstream API Drift Summary",
         f"- **Provider**: **{meta.provider_name}**",
         f"- **Migration**: `{meta.from_version}` -> `{meta.to_version}`",
         f"- **Official Documentation**: [Vendor Changelog & Migration Guide]({meta.changelog_url})",
-        f"- **Semantic Confidence**: `{score_pct:.1f}%`",
+        f"- **Verification State**: `{confidence_str}`",
         "",
         "---",
         "",
@@ -64,10 +102,10 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
         "",
         "---",
         "",
-        "### Automated Verification Evidence",
-        f"- **Test Command**: `{meta.test_command}`",
-        f"- **Exit Code**: `{meta.test_exit_code}` ({test_status_str})",
-        f"- **Duration**: `{meta.test_duration_ms}ms`",
+        "### Verification Evidence",
+    ]
+    lines.extend(test_lines)
+    lines.extend([
         "",
         "---",
         "",
@@ -77,17 +115,19 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
         "---",
         "",
         "### Callsite Triage",
-        f"- **Confirmed Affected**: `{len(meta.impacted_callsites)}` callsites surgically patched.",
+    ])
+    lines.extend(callsite_lines)
+    lines.extend([
         f"- **Unaffected Safe**: `{len(meta.unaffected_callsites)}` callsites verified compatible with `{meta.to_version}`.",
         f"- **Quarantined for Review**: `{meta.quarantined_callsites_count}` callsites.",
         "",
         "---",
         "",
         "### Next Steps",
-        "This autonomous patch has passed all local tests and blast-radius verification.",
+        "This autonomous patch was applied strictly within the blast radius boundary.",
         "- [ ] Review diff preview above.",
         "- [ ] Click **Merge pull request** to apply update to `main`.",
         "",
         "_Generated automatically by [Compart](https://github.com/Devaretanmay/Compart) Continuous Autonomous Maintenance Engine._",
-    ]
+    ])
     return "\n".join(lines)

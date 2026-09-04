@@ -14,9 +14,10 @@ from typing import Any, Dict, List, Optional
 from compart.ai_planner import AIPatchPlanner
 from compart.github.client import GitHubAppClient
 from compart.github.trust_pr import generate_trust_pr_markdown, TrustPRMetadata
+from compart.maintenance_agents import ImpactAnalyst
 from compart.patch_writer import apply_rewrites, PatchResult
 from compart.providers.registry import get_default_registry
-from compart.sandbox.snapshot import SnapshotManager
+from compart.sandbox.snapshot import SnapshotManager, _file_hash
 
 try:
     from compart._core import route_and_compress
@@ -88,10 +89,11 @@ def _detect_test_command(repo_dir: str) -> str:
                     return f"npm run {candidate}" if candidate != "test" else "npm test"
         except Exception:
             pass
-        return "exit 0"
     if os.path.exists(os.path.join(repo_dir, "pytest.ini")) or os.path.exists(os.path.join(repo_dir, "tests")):
         return "pytest -q"
-    return "exit 0"
+    if os.path.exists(os.path.join(repo_dir, "Cargo.toml")):
+        return "cargo test"
+    return ""
 
 
 def _run_install(repo_dir: str, timeout: int = 120) -> subprocess.CompletedProcess:
@@ -271,7 +273,6 @@ def run_maintenance_cycle(
     if use_ai or not patch_results:
         ai_planner = AIPatchPlanner.from_env(api_key=llm_api_key, model=llm_model, base_url=llm_base_url)
         if ai_planner:
-            from compart.maintenance_agents import ImpactAnalyst
             impact = ImpactAnalyst().analyze_impact(repo_dir, provider_name)
             target_files = impact.affected_files
             if target_files:
@@ -302,13 +303,11 @@ def run_maintenance_cycle(
         for fn in filenames:
             fp = os.path.abspath(os.path.join(dirpath, fn))
             try:
-                from compart.sandbox.snapshot import _file_hash
                 snap_hash = snapshotter._snapshot_dir
                 rel = os.path.relpath(fp, repo_dir)
                 snap_copy = os.path.join(snap_hash, rel)
                 if os.path.exists(snap_copy):
-                    from compart.sandbox.snapshot import _file_hash as fh
-                    if fh(fp) != fh(snap_copy):
+                    if _file_hash(fp) != _file_hash(snap_copy):
                         all_changed.add(fp)
             except Exception:
                 pass
