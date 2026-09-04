@@ -19,6 +19,54 @@ except ImportError:
     _YAML_AVAILABLE = False
 
 
+@dataclass
+class PipelinePolicy:
+    """Controls how the pipeline behaves for a given trigger context."""
+
+    pr_review: bool = True
+    pr_auto_fix: bool = False
+    external_auto_fix: bool = False
+    auto_fix_providers: List[str] = field(default_factory=list)
+    always_report_clean: bool = True
+    inline_comments: bool = True
+
+    def auto_fix_enabled_for(self, ctx: Any) -> bool:
+        event_type = getattr(ctx, "event_type", "")
+        if event_type in ("pull_request.opened", "pull_request.synchronize", "pull_request.reopened"):
+            if not self.pr_auto_fix:
+                return False
+        elif event_type.startswith("external.change"):
+            if not self.external_auto_fix:
+                return False
+        else:
+            return False
+
+        if self.auto_fix_providers:
+            provider = getattr(ctx, "provider_name", "") or ""
+            if provider and provider.lower() not in {p.lower() for p in self.auto_fix_providers}:
+                return False
+        return True
+
+
+@dataclass
+class BotConfig:
+    """Compart GitHub App behavior policy.
+
+    These flags are the product policy surface. They control whether the bot
+    reviews PRs automatically, auto-fixes, and which providers it is allowed
+    to auto-fix.
+    """
+
+    enabled: bool = True
+    pr_review: bool = True
+    pr_auto_fix: bool = False
+    external_change_watch: bool = True
+    external_auto_fix: bool = False
+    auto_fix_providers: List[str] = field(default_factory=list)
+    always_report_clean: bool = True
+    inline_comments: bool = True
+
+
 _FILESYSTEM_TO_PERMISSIONS: Dict[str, List[str]] = {
     "workspace":  ["fs_read", "fs_write"],
     "read-only":  ["fs_read"],
@@ -79,6 +127,8 @@ class WorkspaceConfig:
     compartments: Dict[str, CompartmentConfig] = field(default_factory=dict)
     agents: Dict[str, AgentConfig] = field(default_factory=dict)
     workflows: Dict[str, WorkflowConfig] = field(default_factory=dict)
+    # GitHub App product behavior.
+    bot: BotConfig = field(default_factory=BotConfig)
 
     def compartment_for_agent(self, agent_name: str) -> CompartmentConfig:
         """Return the CompartmentConfig the agent should run in."""
@@ -90,6 +140,18 @@ class WorkspaceConfig:
         comp = self.compartment_for_agent(agent_name)
         return {"permissions": comp.permissions}
 
+    def pipeline_policy(self) -> "PipelinePolicy":
+        """Convert workspace bot config into the pipeline policy shape."""
+        b = self.bot
+        return PipelinePolicy(
+            pr_review=b.pr_review and b.enabled,
+            pr_auto_fix=b.pr_auto_fix and b.enabled,
+            external_auto_fix=b.external_auto_fix and b.enabled,
+            auto_fix_providers=b.auto_fix_providers,
+            always_report_clean=b.always_report_clean,
+            inline_comments=b.inline_comments,
+        )
+
 
 def _default_compartment() -> CompartmentConfig:
     return CompartmentConfig(
@@ -100,11 +162,16 @@ def _default_compartment() -> CompartmentConfig:
     )
 
 
+def _default_bot_config() -> "BotConfig":
+    return BotConfig()
+
+
 def _default_config() -> WorkspaceConfig:
     return WorkspaceConfig(
         compartments={"default": _default_compartment()},
         agents={},
         workflows={},
+        bot=_default_bot_config(),
     )
 
 
@@ -146,6 +213,20 @@ def load_config(config_path: Optional[str] = None) -> WorkspaceConfig:
         )
     if "default" not in compartments:
         compartments["default"] = _default_compartment()
+
+    bot = _default_bot_config()
+    if "bot" in raw and isinstance(raw["bot"], dict):
+        bot_cfg = raw["bot"]
+        bot = BotConfig(
+            enabled=bool(bot_cfg.get("enabled", True)),
+            pr_review=bool(bot_cfg.get("pr_review", True)),
+            pr_auto_fix=bool(bot_cfg.get("pr_auto_fix", False)),
+            external_change_watch=bool(bot_cfg.get("external_change_watch", True)),
+            external_auto_fix=bool(bot_cfg.get("external_auto_fix", False)),
+            auto_fix_providers=list(bot_cfg.get("auto_fix_providers", []) or []),
+            always_report_clean=bool(bot_cfg.get("always_report_clean", True)),
+            inline_comments=bool(bot_cfg.get("inline_comments", True)),
+        )
 
     agents: Dict[str, AgentConfig] = {}
     for aname, adata in (raw.get("agents") or {}).items():

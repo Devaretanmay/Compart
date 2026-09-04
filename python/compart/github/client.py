@@ -23,6 +23,18 @@ def verify_webhook_signature(payload: bytes, signature_header: Optional[str], se
     return hmac.compare_digest(mac.hexdigest(), expected_hash)
 
 
+def _get_gh_cli_token() -> Optional[str]:
+    """Retrieve GitHub token from gh CLI if available."""
+    try:
+        import subprocess
+        proc = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=5)
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
 class GitHubAppClient:
     """Client for GitHub REST API, supporting Personal Access Tokens and GitHub Apps."""
 
@@ -33,7 +45,7 @@ class GitHubAppClient:
         private_key: Optional[str] = None,
         api_base_url: str = "https://api.github.com",
     ):
-        self.token = token or os.environ.get("GITHUB_TOKEN") or os.environ.get("COMPART_GITHUB_TOKEN")
+        self.token = token or os.environ.get("GITHUB_TOKEN") or os.environ.get("COMPART_GITHUB_TOKEN") or _get_gh_cli_token()
         self.app_id = app_id or os.environ.get("COMPART_GITHUB_APP_ID")
         self.private_key = private_key or os.environ.get("COMPART_GITHUB_PRIVATE_KEY")
         self.api_base_url = api_base_url.rstrip("/")
@@ -168,3 +180,82 @@ class GitHubAppClient:
         if target_url:
             data["target_url"] = target_url
         return self._request("POST", f"repos/{repo}/statuses/{sha}", data=data)
+
+    def get_pull_request(self, repo: str, pr_number: int) -> Dict[str, Any]:
+        """Get pull request details."""
+        return self._request("GET", f"repos/{repo}/pulls/{pr_number}")
+
+    def get_pull_request_files(self, repo: str, pr_number: int) -> List[Dict[str, Any]]:
+        """Get list of files changed in a pull request."""
+        result = self._request("GET", f"repos/{repo}/pulls/{pr_number}/files")
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict) and "files" in result:
+            return result["files"]
+        return []
+
+    def get_pull_request_comments(self, repo: str, pr_number: int) -> List[Dict[str, Any]]:
+        """Get existing review comments on a pull request."""
+        result = self._request("GET", f"repos/{repo}/issues/{pr_number}/comments")
+        if isinstance(result, list):
+            return result
+        return []
+
+    def post_pr_comment(self, repo: str, pr_number: int, body: str) -> Dict[str, Any]:
+        """Post a comment on a pull request issue."""
+        data = {"body": body}
+        return self._request("POST", f"repos/{repo}/issues/{pr_number}/comments", data=data)
+
+    def update_pr_comment(self, repo: str, comment_id: int, body: str) -> Dict[str, Any]:
+        """Update an existing PR comment."""
+        data = {"body": body}
+        return self._request("PATCH", f"repos/{repo}/issues/comments/{comment_id}", data=data)
+
+    def delete_pr_comment(self, repo: str, comment_id: int) -> Dict[str, Any]:
+        """Delete a PR comment."""
+        return self._request("DELETE", f"repos/{repo}/issues/comments/{comment_id}")
+
+    def create_pull_request_review_comment(
+        self,
+        repo: str,
+        pr_number: int,
+        body: str,
+        commit_sha: str,
+        path: str,
+        line: Optional[int] = None,
+        side: str = "right",
+    ) -> Dict[str, Any]:
+        """Create an inline review comment on a pull request."""
+        data: Dict[str, Any] = {
+            "body": body,
+            "commit_sha": commit_sha,
+            "path": path,
+            "side": side,
+        }
+        if line is not None:
+            data["line"] = line
+        return self._request("POST", f"repos/{repo}/pulls/{pr_number}/comments", data=data)
+
+    def get_commit(self, repo: str, sha: str) -> Dict[str, Any]:
+        """Get commit details by SHA."""
+        return self._request("GET", f"repos/{repo}/commits/{sha}")
+
+    def update_pull_request(
+        self,
+        repo: str,
+        pr_number: int,
+        state: Optional[str] = None,
+        base_ref: Optional[str] = None,
+        head_ref: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update a pull request (e.g., auto-merge state)."""
+        data: Dict[str, Any] = {}
+        if state is not None:
+            data["state"] = state
+        if base_ref is not None:
+            data["base"] = base_ref
+        if head_ref is not None:
+            data["head"] = head_ref
+        if not data:
+            return {"success": True}
+        return self._request("PATCH", f"repos/{repo}/pulls/{pr_number}", data=data)

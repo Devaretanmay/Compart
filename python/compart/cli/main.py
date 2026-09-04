@@ -1816,7 +1816,13 @@ def cmd_app(args):
     action = getattr(args, "app_action", "serve")
 
     if action == "serve":
-        server = WebhookServer(port=args.port, secret=args.secret)
+        from compart.github.pr_bot import make_pr_bot_handler
+        from compart.config import load_config
+
+        cfg = load_config()
+        policy = cfg.pipeline_policy()
+        handler = make_pr_bot_handler(policy=policy)
+        server = WebhookServer(port=args.port, secret=args.secret, handler=handler)
         sec_msg = "YES (HMAC-SHA256)" if args.secret else "NO (Set --secret or COMPART_WEBHOOK_SECRET)"
         print("================================================================================")
         print("               COMPART GITHUB APP: CONTINUOUS WEBHOOK LISTENER                  ")
@@ -1968,26 +1974,59 @@ def cmd_providers(args):
 
 
 def cmd_pr(args):
-    """Inspect or preview Developer Trust PR markdown."""
-    provider_name = getattr(args, "provider", "Stripe") or "Stripe"
-    meta = TrustPRMetadata(
-        provider_name=provider_name,
-        from_version="v21.0.0",
-        to_version="v22.0.0",
-        changelog_url="https://docs.stripe.com",
-        files_modified=1,
-        files_scanned=4,
-        unintended_files_modified=0,
-        quarantined_callsites_count=0,
-        unified_diff="--- a/src/billing.ts\n+++ b/src/billing.ts\n@@ -7,1 +7,1 @@\n-    amount: amount,\n+    amount: String(amount),",
-        test_command="npm test",
-        test_exit_code=0,
-        test_duration_ms=42,
-        lockfile_hash="af1349b9f5f9a1a6...",
-        patch_hash="3559d0c1e5a59574...",
-        semantic_score=1.0,
+    """Review a pull request using the Compart PR Bot."""
+    from compart.github.pr_bot import run_on_pr_locally
+    from compart.config import load_config
+
+    workdir = os.path.abspath(getattr(args, "path", "."))
+    cfg = load_config()
+    policy = cfg.pipeline_policy()
+    if getattr(args, "auto_fix", False):
+        policy.pr_auto_fix = True
+
+    repo = getattr(args, "repo", None)
+    if not repo:
+        try:
+            remote = subprocess.run(["git", "config", "--get", "remote.origin.url"], cwd=workdir, capture_output=True, text=True).stdout.strip()
+            if "github.com" in remote:
+                repo = remote.split("github.com")[-1].lstrip(":").lstrip("/").removesuffix(".git")
+        except Exception:
+            pass
+    repo = repo or "local/repo"
+
+    pr_num = getattr(args, "pr_number", 1) or 1
+
+    print("================================================================================")
+    print("                      COMPART AUTOMATED PR CONTRACT GUARD                       ")
+    print("================================================================================\n")
+    print(f"Repository:              {repo}")
+    print(f"PR Number:               #{pr_num}")
+    print(f"Working Directory:       {workdir}")
+    print(f"Auto-Fix Mode:           {'APPLY & COMMIT' if policy.pr_auto_fix else 'AUDIT ONLY'}\n")
+
+    result = run_on_pr_locally(
+        repo=repo,
+        pr_number=pr_num,
+        workdir=workdir,
+        base_branch=getattr(args, "base", "main"),
+        policy=policy,
     )
-    print(generate_trust_pr_markdown(meta))
+
+    status_str = result.get("pipeline_status", "unknown").upper()
+    check_str = result.get("check_state", "unknown").upper()
+    print(f"Pipeline Status:         {status_str}")
+    print(f"Check State:             {check_str}")
+    print(f"Outcome:                 {result.get('check_description', '')}\n")
+
+    if result.get("comment_preview"):
+        print("--- PR Review Comment ---")
+        print(result["comment_preview"])
+        print()
+
+    if result.get("comment_posted"):
+        print("[OK] Review comment posted directly to GitHub Pull Request.\n")
+
+    print("================================================================================")
 
 
 def main():
@@ -2255,8 +2294,13 @@ def main():
     providers_p = subparsers.add_parser("providers", help="List supported providers and migration contract catalog")
     providers_p.add_argument("--json", action="store_true", help="Output machine-readable JSON")
 
-    pr_p = subparsers.add_parser("pr", help="Developer Trust PR tools and previews")
-    pr_p.add_argument("provider", nargs="?", default="stripe", help="Provider name to preview Trust PR for")
+    pr_p = subparsers.add_parser("pr", help="Automated PR review and contract guard")
+    pr_p.add_argument("pr_number", nargs="?", type=int, default=1, help="Pull Request number to review")
+    pr_p.add_argument("--repo", default=None, help="GitHub repository name (owner/repo)")
+    pr_p.add_argument("--path", default=".", help="Local repository checkout path (default: .)")
+    pr_p.add_argument("--base", default="main", help="Base branch to diff against (default: main)")
+    pr_p.add_argument("--auto-fix", action="store_true", help="Apply verified patches automatically")
+    pr_p.add_argument("--provider", default=None, help="Specific provider filter")
 
     graph_p = subparsers.add_parser("graph", help="Query and inspect the External-Change Dependency Graph")
     graph_p.add_argument("path", nargs="?", default=".", help="Repository root path (default: .)")

@@ -1,0 +1,84 @@
+import pytest
+from unittest.mock import MagicMock, patch
+
+from compart.config import PipelinePolicy
+from compart.github.pr_bot import (
+    handle_pull_request_event,
+    handle_external_change_event,
+    make_pr_bot_handler,
+    _extract_changed_files,
+    _safe_preview,
+)
+
+
+def test_extract_changed_files_from_payload():
+    payload_files = {
+        "pull_request": {
+            "files": [{"filename": "src/api.ts"}, {"filename": "package.json"}]
+        }
+    }
+    assert _extract_changed_files(payload_files) == ["src/api.ts", "package.json"]
+
+    payload_meta = {
+        "compart": {"changed_files": ["lib/stripe.ts"]}
+    }
+    assert _extract_changed_files(payload_meta) == ["lib/stripe.ts"]
+
+    assert _extract_changed_files({}) == []
+
+
+def test_safe_preview():
+    text = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8"
+    preview = _safe_preview(text)
+    assert len(preview.splitlines()) == 6
+    assert _safe_preview("") == ""
+
+
+def test_handle_pull_request_event_validation_failures():
+    client = MagicMock()
+    policy = PipelinePolicy()
+
+    res_no_pr = handle_pull_request_event({}, "pull_request.opened", client, policy)
+    assert res_no_pr["success"] is False
+    assert "No pull_request" in res_no_pr["error"]
+
+    res_no_repo = handle_pull_request_event(
+        {"pull_request": {"number": 1}},
+        "pull_request.opened",
+        client,
+        policy,
+    )
+    assert res_no_repo["success"] is False
+    assert "No repository" in res_no_repo["error"]
+
+    res_no_head = handle_pull_request_event(
+        {"pull_request": {"number": 1}, "repository": {"full_name": "acme/repo"}},
+        "pull_request.opened",
+        client,
+        policy,
+    )
+    assert res_no_head["success"] is False
+    assert "Missing PR head info" in res_no_head["error"]
+
+
+def test_make_pr_bot_handler_dispatches_events():
+    client = MagicMock()
+    policy = PipelinePolicy()
+
+    handler = make_pr_bot_handler(client=client, policy=policy)
+
+    res_unhandled = handler({}, "issues.opened")
+    assert res_unhandled["success"] is True
+    assert res_unhandled["handled"] is False
+
+    with patch("compart.github.pr_bot.handle_pull_request_event") as mock_handle_pr:
+        mock_handle_pr.return_value = {"success": True, "handled_pr": True}
+        res_pr = handler({"pull_request": {}}, "pull_request.opened")
+        assert res_pr["handled_pr"] is True
+        mock_handle_pr.assert_called_once()
+
+    with patch("compart.github.pr_bot.handle_external_change_event") as mock_handle_ext:
+        mock_handle_ext.return_value = {"success": True, "handled_ext": True}
+        res_ext = handler({}, "external.change.drift")
+        assert res_ext["handled_ext"] is True
+        mock_handle_ext.assert_called_once()

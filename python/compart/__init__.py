@@ -8,6 +8,8 @@ from . import graph as graph
 from . import audit as audit
 from . import maintenance as maintenance
 from . import maintenance_agents as maintenance_agents
+from . import pipeline as pipeline
+from . import github as github
 
 try:
     from importlib.metadata import version as _package_version
@@ -29,6 +31,8 @@ __all__ = [
     "audit",
     "maintenance",
     "maintenance_agents",
+    "pipeline",
+    "github",
 ]
 
 
