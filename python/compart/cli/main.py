@@ -2014,8 +2014,11 @@ def cmd_pr(args):
 
     status_str = result.get("pipeline_status", "unknown").upper()
     check_str = result.get("check_state", "unknown").upper()
+    mergeable = result.get("mergeable", False)
+    merge_str = "YES [MERGE_READY]" if mergeable else "NO [BLOCKED: UNVERIFIED]"
     print(f"Pipeline Status:         {status_str}")
     print(f"Check State:             {check_str}")
+    print(f"Mergeable:               {merge_str}")
     print(f"Outcome:                 {result.get('check_description', '')}\n")
 
     if result.get("comment_preview"):

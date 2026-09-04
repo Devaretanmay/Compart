@@ -308,7 +308,13 @@ class MaintenancePipeline:
 
         surfaced = self._run_stage("surface", ctx)
 
-        status = "verified_fix" if analysis.has_findings and surfaced.committed else "commented"
+        if analysis.has_findings and surfaced.committed:
+            if analysis.test_command and analysis.test_exit_code == 0:
+                status = "verified_fix"
+            else:
+                status = "unverified_fix"
+        else:
+            status = "commented"
         return PipelineResult(
             context=ctx,
             analysis=analysis,
@@ -379,6 +385,7 @@ class SurfaceResult:
     committed: bool = False
     commit_url: Optional[str] = None
     pr_url: Optional[str] = None
+    mergeable: bool = False
 
 
 # ── Pipeline result ────────────────────────────────────────────────────────
@@ -395,8 +402,16 @@ class PipelineResult:
     pr_url: Optional[str] = None
 
     @property
+    def mergeable(self) -> bool:
+        if self.status == "clean" and not self.analysis.modified_files:
+            return True
+        if self.status == "verified_fix" and bool(self.analysis.test_command) and self.analysis.test_exit_code == 0:
+            return True
+        return False
+
+    @property
     def check_state(self) -> str:
-        if self.status in ("verified_fix", "clean"):
+        if self.mergeable:
             return "success"
         return "failure"
 
@@ -743,10 +758,17 @@ def surface_result(
         except Exception as e:
             _logger.warning("failed to post PR comment: %s", e)
 
+    is_mergeable = False
+    if not analysis.has_findings and not analysis.modified_files:
+        is_mergeable = True
+    elif analysis.verified and bool(analysis.test_command) and analysis.test_exit_code == 0:
+        is_mergeable = True
+
     return SurfaceResult(
         comment_body=comment,
         status_description=status_desc,
         committed=committed,
         commit_url=f"https://github.com/{ctx.repository}/commit/{commit_sha}" if commit_sha else None,
         pr_url=f"https://github.com/{ctx.repository}/pull/{ctx.pr_number}" if ctx.pr_number else None,
+        mergeable=is_mergeable,
     )

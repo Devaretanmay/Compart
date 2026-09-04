@@ -7,6 +7,7 @@ from compart.pipeline import (
     DriftFinding,
     AnalysisResult,
     MaintenancePipeline,
+    PipelineResult,
     surface_result,
     analyze_trigger_context,
 )
@@ -171,6 +172,7 @@ def test_surface_result_verified_autofix():
 
     assert "autonomous repair verified" in surface.status_description
     assert "Blast Radius Containment Receipt" in surface.comment_body
+    assert surface.mergeable is True
     client.post_pr_comment.assert_called_once()
 
 
@@ -203,4 +205,71 @@ def test_surface_result_unconfigured_tests():
 
     assert "test suite unconfigured" in surface.status_description
     assert "[UNVERIFIED: NO AUTOMATED TEST SUITE]" in surface.comment_body
+    assert surface.mergeable is False
     client.post_pr_comment.assert_called_once()
+
+
+def test_pipeline_result_mergeability_rules():
+    ctx = TriggerContext(
+        event_id="e1",
+        event_type="pull_request.opened",
+        repository="acme/repo",
+        ref="main",
+        sha="abc",
+        workdir="/tmp",
+    )
+
+    clean_res = PipelineResult(
+        context=ctx,
+        analysis=AnalysisResult(context=ctx, findings=[]),
+        status="clean",
+        comment_body="clean",
+        status_description="no impact",
+    )
+    assert clean_res.mergeable is True
+    assert clean_res.check_state == "success"
+
+    verified_res = PipelineResult(
+        context=ctx,
+        analysis=AnalysisResult(
+            context=ctx,
+            findings=[],
+            test_command="pytest",
+            test_exit_code=0,
+        ),
+        status="verified_fix",
+        comment_body="verified",
+        status_description="verified fix",
+    )
+    assert verified_res.mergeable is True
+    assert verified_res.check_state == "success"
+
+    unverified_res = PipelineResult(
+        context=ctx,
+        analysis=AnalysisResult(
+            context=ctx,
+            findings=[],
+            test_command="",
+            test_exit_code=0,
+        ),
+        status="unverified_fix",
+        comment_body="unverified",
+        status_description="no tests",
+    )
+    assert unverified_res.mergeable is False
+    assert unverified_res.check_state == "failure"
+
+    failed_res = PipelineResult(
+        context=ctx,
+        analysis=AnalysisResult(
+            context=ctx,
+            findings=[],
+            test_command="pytest",
+            test_exit_code=1,
+        ),
+        status="unverified_fix",
+        comment_body="failed",
+        status_description="failed tests",
+    )
+    assert failed_res.mergeable is False
+    assert failed_res.check_state == "failure"

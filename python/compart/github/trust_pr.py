@@ -41,6 +41,12 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
             f"- **Duration**: `{meta.test_duration_ms}ms`",
         ]
         confidence_str = "Verified green against repository test suite"
+        next_steps = [
+            "This autonomous patch has passed all local tests and blast-radius verification.",
+            "- [ ] Review diff preview above.",
+            "- [ ] Click **Merge pull request** to apply update to `main`.",
+            "- **Merge Readiness**: `MERGEABLE (READY)`",
+        ]
     elif not is_real_test:
         status_tag = "[UNVERIFIED: NO AUTOMATED TEST SUITE]"
         test_summary = "no test suite configured"
@@ -49,6 +55,12 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
             "- **Status**: Automated test verification skipped; patch applied by contract specification.",
         ]
         confidence_str = "Unverified by automated tests (no repository test command configured)"
+        next_steps = [
+            "This autonomous patch was applied strictly within the blast radius boundary, but **automated verification could not run because no test runner is configured**.",
+            "- [ ] Review diff preview above.",
+            "- [ ] Verify behavior manually or configure a test suite before merging.",
+            "- **Merge Readiness**: `NOT MERGEABLE (BLOCKED: UNVERIFIED)`",
+        ]
     else:
         status_tag = "[NEEDS REVIEW]"
         test_summary = f"tests ran -> FAILED (exit {meta.test_exit_code})"
@@ -58,6 +70,12 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
             f"- **Duration**: `{meta.test_duration_ms}ms`",
         ]
         confidence_str = "Test failure detected"
+        next_steps = [
+            "This autonomous patch failed local test execution and requires human repair.",
+            "- [ ] Inspect failing test output.",
+            "- [ ] Manually repair callsites before merging.",
+            "- **Merge Readiness**: `NOT MERGEABLE (BLOCKED: FAILING TESTS)`",
+        ]
 
     diff_block = ""
     if meta.unified_diff:
@@ -124,9 +142,9 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
         "---",
         "",
         "### Next Steps",
-        "This autonomous patch was applied strictly within the blast radius boundary.",
-        "- [ ] Review diff preview above.",
-        "- [ ] Click **Merge pull request** to apply update to `main`.",
+    ])
+    lines.extend(next_steps)
+    lines.extend([
         "",
         "_Generated automatically by [Compart](https://github.com/Devaretanmay/Compart) Continuous Autonomous Maintenance Engine._",
     ])

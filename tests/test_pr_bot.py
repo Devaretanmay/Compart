@@ -109,3 +109,33 @@ def test_render_day0_onboarding_issue():
     assert "COMPART DAY-0 REPOSITORY ONBOARDING" in content
     assert "acme/backend" in content
     assert "Continuous Guard Status:" in content
+
+
+def test_handle_pull_request_event_mergeable_flag():
+    client = MagicMock()
+    policy = PipelinePolicy()
+    payload = {
+        "action": "opened",
+        "repository": {"full_name": "acme/backend"},
+        "pull_request": {
+            "number": 5,
+            "title": "Clean PR",
+            "body": "No changes",
+            "head": {"ref": "feat", "sha": "123"},
+            "base": {"ref": "main"},
+        },
+    }
+    with patch("compart.github.pr_bot.MaintenancePipeline") as mock_pipe_cls:
+        mock_pipe = mock_pipe_cls.return_value
+        mock_result = MagicMock()
+        mock_result.status = "clean"
+        mock_result.mergeable = True
+        mock_result.check_state = "success"
+        mock_result.status_description = "clean"
+        mock_result.comment_body = "clean comment"
+        mock_pipe.run.return_value = mock_result
+
+        res = handle_pull_request_event(payload, "pull_request.opened", client, policy)
+        assert res["success"] is True
+        assert res["mergeable"] is True
+        assert res["check_state"] == "success"

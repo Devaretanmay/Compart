@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import time
 from typing import Any, Callable, Dict, List, Optional
 
@@ -87,6 +88,7 @@ def handle_pull_request_event(
         "repository": repo,
         "pr_number": number,
         "pipeline_status": result.status,
+        "mergeable": result.mergeable,
         "check_state": result.check_state,
         "check_description": result.status_description,
         "comment_posted": bool(result.comment_body),
@@ -152,6 +154,7 @@ def handle_external_change_event(
         "event_type": "external.change.drift",
         "repository": repo,
         "pipeline_status": result.status,
+        "mergeable": result.mergeable,
         "check_state": result.check_state,
         "comment_posted": bool(result.comment_body),
     }
@@ -202,8 +205,6 @@ def run_on_pr_locally(
 
 def _diff_files_locally(workdir: str, base_branch: str) -> List[str]:
     """Return files changed in the current checkout relative to base_branch."""
-    import subprocess
-
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", base_branch],
