@@ -11,6 +11,7 @@ import tempfile
 import time
 from typing import Any, Dict, List, Optional
 
+from compart.ai_planner import AIPatchPlanner
 from compart.github.client import GitHubAppClient
 from compart.github.trust_pr import generate_trust_pr_markdown, TrustPRMetadata
 from compart.patch_writer import apply_rewrites, PatchResult
@@ -230,6 +231,10 @@ def run_maintenance_cycle(
     create_pr: bool = False,
     github_repo: Optional[str] = None,
     github_client: Optional[GitHubAppClient] = None,
+    use_ai: bool = False,
+    llm_api_key: Optional[str] = None,
+    llm_model: Optional[str] = None,
+    llm_base_url: Optional[str] = None,
 ) -> MaintenanceRunReport:
     """Execute full autonomous maintenance loop on a repository."""
     repo_dir = os.path.abspath(repo_dir)
@@ -258,7 +263,31 @@ def run_maintenance_cycle(
     snapshotter = SnapshotManager(workdir=repo_dir, snapshot_dir=snapshot_dir)
     files_scanned = snapshotter.snapshot()
 
-    patch_results: List[PatchResult] = apply_rewrites(repo_dir, rewrites, dry_run=False)
+    patch_results: List[PatchResult] = []
+    if not use_ai and rewrites:
+        patch_results = apply_rewrites(repo_dir, rewrites, dry_run=False)
+
+    ai_planner = None
+    if use_ai or not patch_results:
+        ai_planner = AIPatchPlanner.from_env(api_key=llm_api_key, model=llm_model, base_url=llm_base_url)
+        if ai_planner:
+            from compart.maintenance_agents import ImpactAnalyst
+            impact = ImpactAnalyst().analyze_impact(repo_dir, provider_name)
+            target_files = impact.affected_files
+            if target_files:
+                migration_desc = migration.description if migration else f"Upgrade {provider_name} to {actual_to}"
+                ai_results = ai_planner.plan_and_apply(
+                    repo_dir=repo_dir,
+                    affected_files=target_files,
+                    provider_name=provider_name,
+                    from_version=actual_from,
+                    to_version=actual_to,
+                    migration_details=migration_desc,
+                    dry_run=False,
+                )
+                if ai_results:
+                    patch_results.extend(ai_results)
+
     modified_paths = [os.path.abspath(r.file_path) for r in patch_results if r.success]
     files_modified = len(modified_paths)
     unified_diff = "\n".join(r.unified_diff for r in patch_results if r.unified_diff)
@@ -313,6 +342,26 @@ def run_maintenance_cycle(
             test_exit_code = 1
             raw_output = str(exc)
         test_duration_ms = max(1, int((time.time() - test_start) * 1000))
+
+        # AI Self-Repair Loop: if tests failed and AI planner is available, retry once with test error
+        if test_exit_code != 0 and ai_planner and modified_paths:
+            retry_results = ai_planner.plan_and_apply(
+                repo_dir=repo_dir,
+                affected_files=modified_paths,
+                provider_name=provider_name,
+                from_version=actual_from,
+                to_version=actual_to,
+                migration_details=migration.description if migration else "",
+                test_error=raw_output,
+                dry_run=False,
+            )
+            if retry_results:
+                run_style_formatter(repo_dir, modified_paths)
+                retry_proc = _run_tests(repo_dir, test_cmd, timeout=120)
+                if retry_proc.returncode == 0:
+                    test_exit_code = 0
+                    patch_results = retry_results
+                    unified_diff = "\n".join(r.unified_diff for r in patch_results if r.unified_diff)
 
     compressed_log = route_and_compress(raw_output)
 

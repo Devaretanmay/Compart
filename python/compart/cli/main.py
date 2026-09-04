@@ -1859,6 +1859,10 @@ def cmd_maintain(args):
         to_version=args.to_version,
         create_pr=args.create_pr,
         github_repo=args.repo,
+        use_ai=getattr(args, "ai", False),
+        llm_api_key=getattr(args, "api_key", None),
+        llm_model=getattr(args, "model", None),
+        llm_base_url=getattr(args, "base_url", None),
     )
 
     if getattr(args, "json", False):
@@ -2223,6 +2227,10 @@ def main():
     fix_p.add_argument("--show-pr", action="store_true", help="Display the Trust PR body")
     fix_p.add_argument("--repo", default=None, help="GitHub repository name (owner/repo) for PR creation")
     fix_p.add_argument("--json", action="store_true", help="Output machine-readable JSON")
+    fix_p.add_argument("--ai", action="store_true", help="Force AI LLM patch generation instead of deterministic rules")
+    fix_p.add_argument("--model", default=None, help="BYOK LLM model name (e.g. claude-3-5-sonnet-20241022, gpt-4o)")
+    fix_p.add_argument("--api-key", default=None, help="BYOK LLM API key (or set ANTHROPIC_API_KEY/OPENAI_API_KEY)")
+    fix_p.add_argument("--base-url", default=None, help="Custom LLM base URL (e.g. for local Ollama/vLLM)")
 
     maintain_p = subparsers.add_parser("maintain", help="Alias for fix")
     maintain_p.add_argument("root_dir", nargs="?", default=".", help="Codebase directory (default: .)")
@@ -2234,6 +2242,10 @@ def main():
     maintain_p.add_argument("--show-pr", action="store_true", help="Display the Trust PR body")
     maintain_p.add_argument("--repo", default=None, help="GitHub repository name (owner/repo) for PR creation")
     maintain_p.add_argument("--json", action="store_true", help="Output machine-readable JSON")
+    maintain_p.add_argument("--ai", action="store_true", help="Force AI LLM patch generation instead of deterministic rules")
+    maintain_p.add_argument("--model", default=None, help="BYOK LLM model name (e.g. claude-3-5-sonnet-20241022, gpt-4o)")
+    maintain_p.add_argument("--api-key", default=None, help="BYOK LLM API key (or set ANTHROPIC_API_KEY/OPENAI_API_KEY)")
+    maintain_p.add_argument("--base-url", default=None, help="Custom LLM base URL (e.g. for local Ollama/vLLM)")
 
     app_p = subparsers.add_parser("app", help="Manage Compart GitHub App and Webhook server")
     app_p.add_argument("app_action", nargs="?", default="serve", choices=["serve", "status"], help="App action")

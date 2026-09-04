@@ -12,10 +12,14 @@ def test_detect_drift_in_fixture():
     assert stripe_dep["declared_version"] == "^11.18.0"
 
 
-def test_run_maintenance_cycle_taxonomy():
+def test_run_maintenance_cycle_taxonomy(tmp_path):
+    import shutil
     fixture_dir = "trials/fixtures/taxonomy_stripe"
+    target_dir = str(tmp_path / "taxonomy_stripe")
+    shutil.copytree(fixture_dir, target_dir)
+
     report = run_maintenance_cycle(
-        repo_dir=fixture_dir,
+        repo_dir=target_dir,
         provider_name="stripe",
         from_version="11.18.0",
         to_version="22.0.0",
@@ -30,7 +34,7 @@ def test_run_maintenance_cycle_taxonomy():
     assert "Autonomous Maintenance" in report.trust_pr_body
     assert "Blast Radius Containment" in report.trust_pr_body
 
-    history = get_migration_history(fixture_dir)
+    history = get_migration_history(target_dir)
     assert len(history) > 0
     latest = history[-1]
     assert latest["provider_name"].lower() == "stripe"

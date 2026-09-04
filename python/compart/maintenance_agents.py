@@ -7,6 +7,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from compart import autopatch
+from compart.ai_planner import AIPatchPlanner
 from compart.graph import build_dependency_graph, audit_dependency_graph
 from compart.patch_writer import apply_rewrites
 from compart.providers.registry import get_default_registry, ProviderSpec, ProviderMigration
@@ -120,13 +121,34 @@ class ImpactAnalyst:
 
 
 class PatchPlanner:
-    def plan(self, repo_dir: str, change_analysis: ChangeAnalysisResult) -> PatchPlanResult:
+    def __init__(self, ai_planner: Optional[AIPatchPlanner] = None):
+        self.ai_planner = ai_planner
+
+    def plan(self, repo_dir: str, change_analysis: ChangeAnalysisResult, use_ai: bool = False) -> PatchPlanResult:
         registry = get_default_registry()
         p_spec = registry.get(change_analysis.provider)
         migration = next(iter(p_spec.migrations.values())) if p_spec and p_spec.migrations else None
 
         rewrites = migration.rewrites if migration else []
-        patch_results = apply_rewrites(repo_dir, rewrites, dry_run=True)
+        patch_results = []
+        if not use_ai and rewrites:
+            patch_results = apply_rewrites(repo_dir, rewrites, dry_run=True)
+
+        if use_ai or not patch_results:
+            planner = self.ai_planner or AIPatchPlanner.from_env()
+            if planner:
+                impact = ImpactAnalyst().analyze_impact(repo_dir, change_analysis.provider)
+                if impact.affected_files:
+                    desc = change_analysis.mutations[0]["description"] if change_analysis.mutations else ""
+                    patch_results = planner.plan_and_apply(
+                        repo_dir=repo_dir,
+                        affected_files=impact.affected_files,
+                        provider_name=change_analysis.provider,
+                        from_version=change_analysis.from_version,
+                        to_version=change_analysis.to_version,
+                        migration_details=desc,
+                        dry_run=True,
+                    )
 
         targets = [
             {
@@ -185,23 +207,41 @@ class PatchVerifier:
 
 
 class AutonomousMaintenancePipeline:
-    def __init__(self):
+    def __init__(self, ai_planner: Optional[AIPatchPlanner] = None):
         self.change_analyzer = ChangeAnalyzer()
         self.impact_analyst = ImpactAnalyst()
-        self.patch_planner = PatchPlanner()
+        self.patch_planner = PatchPlanner(ai_planner=ai_planner)
         self.patch_verifier = PatchVerifier()
+        self.ai_planner = ai_planner
 
-    def run(self, repo_dir: str, provider_name: str, from_version: Optional[str] = None, to_version: Optional[str] = None) -> Dict[str, Any]:
+    def run(self, repo_dir: str, provider_name: str, from_version: Optional[str] = None, to_version: Optional[str] = None, use_ai: bool = False) -> Dict[str, Any]:
         change_info = self.change_analyzer.analyze(provider_name, from_version, to_version)
         impact_info = self.impact_analyst.analyze_impact(repo_dir, provider_name)
-        patch_plan = self.patch_planner.plan(repo_dir, change_info)
+        patch_plan = self.patch_planner.plan(repo_dir, change_info, use_ai=use_ai)
 
         registry = get_default_registry()
         p_spec = registry.get(provider_name)
         migration = next(iter(p_spec.migrations.values())) if p_spec and p_spec.migrations else None
         rewrites = migration.rewrites if migration else []
 
-        real_results = apply_rewrites(repo_dir, rewrites, dry_run=False)
+        real_results = []
+        if not use_ai and rewrites:
+            real_results = apply_rewrites(repo_dir, rewrites, dry_run=False)
+
+        if use_ai or not real_results:
+            planner = self.ai_planner or AIPatchPlanner.from_env()
+            if planner and impact_info.affected_files:
+                desc = change_info.mutations[0]["description"] if change_info.mutations else ""
+                real_results = planner.plan_and_apply(
+                    repo_dir=repo_dir,
+                    affected_files=impact_info.affected_files,
+                    provider_name=provider_name,
+                    from_version=change_info.from_version,
+                    to_version=change_info.to_version,
+                    migration_details=desc,
+                    dry_run=False,
+                )
+
         unified_diff = "\n".join(r.unified_diff for r in real_results if r.unified_diff)
         modified_paths = [r.file_path for r in real_results if r.success]
 
