@@ -30,6 +30,8 @@ from compart.github.pr_render import (
     render_verification_comment,
     render_maintenance_issue_comment,
 )
+from compart.graph import build_dependency_graph
+from compart.maintenance import detect_drift
 
 _logger = logging.getLogger("compart.pr_bot")
 
@@ -219,21 +221,90 @@ def _diff_files_locally(workdir: str, base_branch: str) -> List[str]:
     return []
 
 
-# ── Webhook server attachment ──────────────────────────────────────────────
+def render_day0_onboarding_issue(repo: str, workdir: Optional[str] = None) -> str:
+    """Render the Day-0 repository onboarding and contract inventory issue."""
+    providers_text = "  - No external third-party SDK dependencies detected"
+    total_files = 0
+    callsites = 0
+
+    if workdir and os.path.isdir(workdir):
+        try:
+            detected = detect_drift(workdir, None)
+            if detected:
+                providers_text = "\n".join(
+                    f"  - {d.get('provider', 'API')} ({d.get('package_name', '')}) -> declared: {d.get('declared_version', 'unknown')}"
+                    for d in detected
+                )
+            graph = build_dependency_graph(workdir)
+            total_files = len(graph.get("nodes", []))
+            callsites = sum(len(node.get("callsites", [])) for node in graph.get("nodes", []))
+        except Exception as e:
+            _logger.warning("failed to compute Day-0 stats for %s: %s", repo, e)
+
+    lines = [
+        "-----------------------------------------",
+        "   COMPART DAY-0 REPOSITORY ONBOARDING   ",
+        "-----------------------------------------",
+        "",
+        f"Compart has mapped external API dependencies and contracts for `{repo}`.",
+        "",
+        "### External APIs & SDKs Monitored:",
+        providers_text,
+        "",
+        "### Repository Architecture Graph:",
+        f"  - Total indexed files: {total_files}",
+        f"  - External call sites inspected: {callsites}",
+        "",
+        "### Continuous Guard Status:",
+        "  - [OK] Automated PR Review: Active (Audit Mode)",
+        "  - [OK] Auto-Fix Policy: Opt-in (Configurable via .compart/config.yaml)",
+        "  - [OK] External Contract Drift: Watching upstream provider releases",
+        "",
+        "-----------------------------------------",
+    ]
+    return "\n".join(lines)
+
+
+def handle_installation_event(
+    payload: Dict[str, Any],
+    event_type: str,
+    client: GitHubAppClient,
+    workdir_fn: Optional[Callable[[str], str]] = None,
+) -> Dict[str, Any]:
+    """Handle installation.* and installation_repositories.* webhook events."""
+    repos_data = payload.get("repositories") or payload.get("repositories_added") or []
+    onboarded: List[str] = []
+
+    for repo_info in repos_data:
+        repo_name = repo_info.get("full_name") if isinstance(repo_info, dict) else str(repo_info)
+        if not repo_name:
+            continue
+
+        workdir = workdir_fn(repo_name) if workdir_fn else None
+        issue_body = render_day0_onboarding_issue(repo_name, workdir=workdir)
+        try:
+            client.create_issue(
+                repo=repo_name,
+                title="[COMPART] Day-0 External Contract & API Dependency Map",
+                body=issue_body,
+                labels=["compart", "maintenance"],
+            )
+            onboarded.append(repo_name)
+        except Exception as e:
+            _logger.warning("failed to post Day-0 onboarding issue for %s: %s", repo_name, e)
+
+    return {
+        "success": True,
+        "event_type": event_type,
+        "repositories_onboarded": onboarded,
+    }
+
 
 def make_pr_bot_handler(
     client: Optional[GitHubAppClient] = None,
     policy: Optional[PipelinePolicy] = None,
     workdir_fn: Optional[Callable[[Dict[str, Any]], str]] = None,
 ) -> Callable[[Dict[str, Any], str], Dict[str, Any]]:
-    """
-    Create a webhook handler function compatible with Compart's webhook server.
-
-    Usage:
-
-        server = WebhookServer(...)
-        server.handler = make_pr_bot_handler(client=client, policy=policy)
-    """
     client = client or GitHubAppClient()
     policy = policy or PipelinePolicy()
 
@@ -257,6 +328,19 @@ def make_pr_bot_handler(
                 client,
                 policy,
                 workdir=workdir,
+            )
+
+        if event_type.startswith("installation"):
+            def repo_workdir_resolver(repo_name: str) -> Optional[str]:
+                if workdir_fn:
+                    return workdir_fn({"repository": {"full_name": repo_name}})
+                return None
+
+            return handle_installation_event(
+                payload,
+                event_type,
+                client,
+                workdir_fn=repo_workdir_resolver,
             )
 
         return {

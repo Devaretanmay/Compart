@@ -259,3 +259,16 @@ class GitHubAppClient:
         if not data:
             return {"success": True}
         return self._request("PATCH", f"repos/{repo}/pulls/{pr_number}", data=data)
+
+    def create_issue(
+        self,
+        repo: str,
+        title: str,
+        body: str,
+        labels: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Create an issue in a repository."""
+        data: Dict[str, Any] = {"title": title, "body": body}
+        if labels:
+            data["labels"] = labels
+        return self._request("POST", f"repos/{repo}/issues", data=data)

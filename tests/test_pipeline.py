@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from compart.config import PipelinePolicy
 from compart.pipeline import (
@@ -140,3 +140,33 @@ def test_surface_result_with_drift_findings():
     assert "Compart found 1 maintenance issue(s)" in surface.status_description
     client.post_pr_comment.assert_called_once()
     assert "COMPART FOUND A MAINTENANCE ISSUE" in surface.comment_body
+
+
+def test_surface_result_verified_autofix():
+    ctx = TriggerContext(
+        event_id="e1",
+        event_type="pull_request.opened",
+        repository="acme/repo",
+        ref="main",
+        sha="abc",
+        workdir="/tmp",
+        pr_number=10,
+    )
+    analysis = AnalysisResult(
+        context=ctx,
+        findings=[],
+        modified_files=["/tmp/src/stripe.ts"],
+        verified=True,
+        trust_pr_body="## Blast Radius Containment Receipt\n[VERIFIED] Autonomous Maintenance",
+    )
+    client = MagicMock()
+    policy = PipelinePolicy(pr_auto_fix=True)
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "abc123456789"
+        surface = surface_result(ctx, analysis, policy, client)
+
+    assert "autonomous repair verified" in surface.status_description
+    assert "Blast Radius Containment Receipt" in surface.comment_body
+    client.post_pr_comment.assert_called_once()

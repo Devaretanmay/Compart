@@ -5,6 +5,8 @@ from compart.config import PipelinePolicy
 from compart.github.pr_bot import (
     handle_pull_request_event,
     handle_external_change_event,
+    handle_installation_event,
+    render_day0_onboarding_issue,
     make_pr_bot_handler,
     _extract_changed_files,
     _safe_preview,
@@ -82,3 +84,28 @@ def test_make_pr_bot_handler_dispatches_events():
         res_ext = handler({}, "external.change.drift")
         assert res_ext["handled_ext"] is True
         mock_handle_ext.assert_called_once()
+
+    with patch("compart.github.pr_bot.handle_installation_event") as mock_handle_inst:
+        mock_handle_inst.return_value = {"success": True, "handled_inst": True}
+        res_inst = handler({"repositories": []}, "installation.created")
+        assert res_inst["handled_inst"] is True
+        mock_handle_inst.assert_called_once()
+
+
+def test_handle_installation_event():
+    client = MagicMock()
+    payload = {
+        "action": "created",
+        "repositories": [{"full_name": "acme/backend"}, {"full_name": "acme/frontend"}],
+    }
+    res = handle_installation_event(payload, "installation.created", client)
+    assert res["success"] is True
+    assert res["repositories_onboarded"] == ["acme/backend", "acme/frontend"]
+    assert client.create_issue.call_count == 2
+
+
+def test_render_day0_onboarding_issue():
+    content = render_day0_onboarding_issue("acme/backend")
+    assert "COMPART DAY-0 REPOSITORY ONBOARDING" in content
+    assert "acme/backend" in content
+    assert "Continuous Guard Status:" in content

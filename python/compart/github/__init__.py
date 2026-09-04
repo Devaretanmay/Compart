@@ -16,6 +16,8 @@ __all__ = [
     "handle_webhook_payload",
     "handle_pull_request_event",
     "handle_external_change_event",
+    "handle_installation_event",
+    "render_day0_onboarding_issue",
     "make_pr_bot_handler",
     "run_on_pr_locally",
 ]
@@ -25,6 +27,8 @@ def __getattr__(name: str):
     if name in (
         "handle_pull_request_event",
         "handle_external_change_event",
+        "handle_installation_event",
+        "render_day0_onboarding_issue",
         "make_pr_bot_handler",
         "run_on_pr_locally",
     ):
