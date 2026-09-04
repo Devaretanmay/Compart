@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from compart import autopatch
 from compart.graph import build_dependency_graph, audit_dependency_graph
+from compart.patch_writer import apply_rewrites
 from compart.providers.registry import get_default_registry, ProviderSpec, ProviderMigration
 
 try:
@@ -124,23 +125,25 @@ class PatchPlanner:
         p_spec = registry.get(change_analysis.provider)
         migration = next(iter(p_spec.migrations.values())) if p_spec and p_spec.migrations else None
 
-        old_spec = "{}"
-        new_spec = "{}"
-        if migration and migration.old_spec_path and os.path.exists(migration.old_spec_path):
-            with open(migration.old_spec_path) as f:
-                old_spec = f.read()
-        if migration and migration.new_spec_path and os.path.exists(migration.new_spec_path):
-            with open(migration.new_spec_path) as f:
-                new_spec = f.read()
+        rewrites = migration.rewrites if migration else []
+        patch_results = apply_rewrites(repo_dir, rewrites, dry_run=True)
 
-        plan_dict = autopatch.generate_maintenance_plan(old_spec, new_spec, repo_dir)
-        targets = plan_dict.get("patch_targets", plan_dict.get("patches", []))
+        targets = [
+            {
+                "file_path": r.file_path,
+                "lines_changed": r.lines_changed,
+                "unified_diff": r.unified_diff,
+                "rules_applied": r.rules_applied,
+            }
+            for r in patch_results if r.success
+        ]
+
         return PatchPlanResult(
             provider=change_analysis.provider,
-            plan_id=plan_dict.get("plan_id", f"plan_{change_analysis.provider}"),
+            plan_id=f"plan_{change_analysis.provider}_{change_analysis.to_version}",
             targets=targets,
             transformations_count=len(targets),
-            raw_plan=plan_dict,
+            raw_plan={"patch_targets": targets, "files_scanned": len(patch_results)},
         )
 
 
@@ -192,9 +195,15 @@ class AutonomousMaintenancePipeline:
         change_info = self.change_analyzer.analyze(provider_name, from_version, to_version)
         impact_info = self.impact_analyst.analyze_impact(repo_dir, provider_name)
         patch_plan = self.patch_planner.plan(repo_dir, change_info)
-        patch_res = autopatch.apply_patch(repo_dir, patch_plan.raw_plan, dry_run=False)
-        unified_diff = "\n".join(r.get("unified_diff", "") for r in patch_res if r.get("unified_diff"))
-        modified_paths = [r.get("file_path") for r in patch_res if r.get("success")]
+
+        registry = get_default_registry()
+        p_spec = registry.get(provider_name)
+        migration = next(iter(p_spec.migrations.values())) if p_spec and p_spec.migrations else None
+        rewrites = migration.rewrites if migration else []
+
+        real_results = apply_rewrites(repo_dir, rewrites, dry_run=False)
+        unified_diff = "\n".join(r.unified_diff for r in real_results if r.unified_diff)
+        modified_paths = [r.file_path for r in real_results if r.success]
 
         verification = self.patch_verifier.verify(repo_dir, expected_modified_files=modified_paths)
         verification.unified_diff = unified_diff
@@ -207,4 +216,5 @@ class AutonomousMaintenancePipeline:
             "patch_plan": patch_plan,
             "verification": verification,
             "unified_diff": unified_diff,
+            "files_modified": len(modified_paths),
         }

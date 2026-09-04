@@ -1869,11 +1869,22 @@ def cmd_maintain(args):
     print(f"Files Scanned/Patched:   {report.files_scanned} scanned, {report.files_modified} modified")
     print(f"Blast-Radius Check:      {'PASS (0 unintended files modified)' if report.blast_radius_verified else 'FAIL'}")
     print(f"Repository Tests:        {'PASSED (Exit 0, ' + str(report.test_duration_ms) + 'ms)' if report.test_exit_code == 0 else 'FAILED (Exit ' + str(report.test_exit_code) + ')'}")
+    if not report.success and report.test_exit_code != 0:
+        print("Rollback:                APPLIED (snapshot restored, no changes left on disk)")
     print(f"Maintenance Outcome:     {'SUCCESS (VERIFIED GREEN)' if report.success else 'REFUSED / INCOMPLETE'}\n")
 
+    if report.patch_results:
+        print("--- Patch Breakdown ---")
+        for r in report.patch_results:
+            rel = os.path.relpath(r.file_path, report.repository_path)
+            print(f"  {rel}  ({r.lines_changed} lines changed)")
+            for rule_desc in r.rules_applied:
+                print(f"    - {rule_desc}")
+        print()
+
     if report.unified_diff:
-        print("--- Surgical AST Patch ---")
-        for line in report.unified_diff.splitlines()[:20]:
+        print("--- Surgical Patch Preview ---")
+        for line in report.unified_diff.splitlines()[:40]:
             print(f"  {line}")
         print()
 

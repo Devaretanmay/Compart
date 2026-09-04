@@ -5,6 +5,15 @@ from typing import Dict, List, Optional
 
 
 @dataclass
+class RewriteRule:
+    pattern: str
+    replacement: str
+    file_extensions: List[str]
+    description: str
+    is_regex: bool = True
+
+
+@dataclass
 class ProviderMigration:
     from_version: str
     to_version: str
@@ -13,6 +22,7 @@ class ProviderMigration:
     old_spec_path: Optional[str] = None
     new_spec_path: Optional[str] = None
     breaking_changes_count: int = 1
+    rewrites: List[RewriteRule] = field(default_factory=list)
 
 
 @dataclass
@@ -62,9 +72,41 @@ class ProviderRegistry:
             from_version="11.18.0",
             to_version="13.0.0",
             changelog_url="https://github.com/stripe/stripe-node/wiki/Migration-guide-for-v13",
-            description="Stripe Node SDK v11 to v13 migration: string amount transformations.",
+            description="Stripe Node SDK v11 to v13 migration.",
             old_spec_path="trials/fixtures/calcom_stripe/specs/stripe_v11.json",
             new_spec_path="trials/fixtures/calcom_stripe/specs/stripe_v13.json",
+            rewrites=[
+                RewriteRule(
+                    pattern=r'apiVersion:\s*"2022-11-15"',
+                    replacement='apiVersion: "2024-06-20"',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Update Stripe apiVersion to 2024-06-20 (required by v13+)",
+                ),
+                RewriteRule(
+                    pattern=r',\s*typescript:\s*true',
+                    replacement='',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Remove deprecated typescript constructor flag (native in v13)",
+                ),
+                RewriteRule(
+                    pattern=r'constructEvent\(\s*(\w+)\s*,\s*(\w+)\s*,\s*(process\.env\.\w+)\s*\)',
+                    replacement=r'constructEvent(\1, \2 as string, \3 as string)',
+                    file_extensions=[".ts", ".tsx"],
+                    description="Explicit string cast for constructEvent (v13 type tightening)",
+                ),
+                RewriteRule(
+                    pattern=r'new Stripe\(process\.env\.(\w+),',
+                    replacement=r'new Stripe(process.env.\1 as string,',
+                    file_extensions=[".ts", ".tsx"],
+                    description="Add as string cast to Stripe constructor key (v13 type safety)",
+                ),
+                RewriteRule(
+                    pattern=r'"stripe":\s*"\^11\.\d+\.\d+"',
+                    replacement='"stripe": "^13.0.0"',
+                    file_extensions=[".json"],
+                    description="Bump stripe package version to ^13.0.0",
+                ),
+            ],
         )
         stripe_spec.migrations["21.0.0->22.0.0"] = ProviderMigration(
             from_version="11.18.0",
@@ -89,10 +131,23 @@ class ProviderRegistry:
             description="OpenAI Node SDK v3 to v4 rewrite: createChatCompletion -> chat.completions.create.",
             old_spec_path="trials/fixtures/langchainjs_openai/specs/openai_v3.json",
             new_spec_path="trials/fixtures/langchainjs_openai/specs/openai_v4.json",
+            rewrites=[
+                RewriteRule(
+                    pattern=r'createChatCompletion\(',
+                    replacement='chat.completions.create(',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx", ".py"],
+                    description="Rename createChatCompletion to chat.completions.create (v4 API)",
+                ),
+                RewriteRule(
+                    pattern=r'new Configuration\(\{',
+                    replacement='new OpenAI({',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Replace Configuration constructor with OpenAI client (v4)",
+                ),
+            ],
         )
         self.register(openai_spec)
 
-        # 3. Anthropic
         anthropic_spec = ProviderSpec(
             name="anthropic",
             display_name="Anthropic SDK",
@@ -104,10 +159,17 @@ class ProviderRegistry:
             to_version="0.5.0",
             changelog_url="https://docs.anthropic.com/en/api/messages",
             description="Anthropic Messages API shift: completions.create -> messages.create.",
+            rewrites=[
+                RewriteRule(
+                    pattern=r'completions\.create\(',
+                    replacement='messages.create(',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx", ".py"],
+                    description="Rename completions.create to messages.create (Anthropic Messages API)",
+                ),
+            ],
         )
         self.register(anthropic_spec)
 
-        # 4. Twilio
         twilio_spec = ProviderSpec(
             name="twilio",
             display_name="Twilio Node Helper",
@@ -116,7 +178,6 @@ class ProviderRegistry:
         )
         self.register(twilio_spec)
 
-        # 5. Resend
         resend_spec = ProviderSpec(
             name="resend",
             display_name="Resend Email SDK",
@@ -125,7 +186,6 @@ class ProviderRegistry:
         )
         self.register(resend_spec)
 
-        # 6. Supabase
         supabase_spec = ProviderSpec(
             name="supabase",
             display_name="Supabase JS Client",

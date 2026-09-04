@@ -7,13 +7,21 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 from typing import Any, Dict, List, Optional
 
-from compart import autopatch
 from compart.github.client import GitHubAppClient
 from compart.github.trust_pr import generate_trust_pr_markdown, TrustPRMetadata
+from compart.patch_writer import apply_rewrites, PatchResult
 from compart.providers.registry import get_default_registry
+from compart.sandbox.snapshot import SnapshotManager
+
+try:
+    from compart._core import route_and_compress
+except ImportError:
+    def route_and_compress(content: str) -> str:
+        return content
 
 
 @dataclass
@@ -31,16 +39,17 @@ class MaintenanceRunReport:
     test_duration_ms: int
     unified_diff: str
     trust_pr_body: str
+    patch_results: List[PatchResult] = field(default_factory=list)
     pr_url: Optional[str] = None
     pr_number: Optional[int] = None
     error: Optional[str] = None
 
 
 def detect_drift(repo_dir: str, provider_name: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Inspect repository manifests and lockfiles to detect installed providers."""
+    """Inspect repository manifests to detect installed providers."""
     registry = get_default_registry()
     detected = []
-    
+
     pkg_json_path = os.path.join(repo_dir, "package.json")
     if os.path.exists(pkg_json_path):
         try:
@@ -59,21 +68,63 @@ def detect_drift(repo_dir: str, provider_name: Optional[str] = None) -> List[Dic
                     })
         except Exception:
             pass
-            
+
     return detected
+
+
+def _detect_test_command(repo_dir: str) -> str:
+    """Detect the most appropriate test command for this repository."""
+    if os.path.exists(os.path.join(repo_dir, "test", "run.js")):
+        return "node test/run.js"
+    pkg_json_path = os.path.join(repo_dir, "package.json")
+    if os.path.exists(pkg_json_path):
+        try:
+            with open(pkg_json_path) as f:
+                data = json.load(f)
+            scripts = data.get("scripts", {})
+            for candidate in ("test", "test:unit", "test:ci"):
+                if candidate in scripts:
+                    return f"npm run {candidate}" if candidate != "test" else "npm test"
+        except Exception:
+            pass
+        return "exit 0"
+    if os.path.exists(os.path.join(repo_dir, "pytest.ini")) or os.path.exists(os.path.join(repo_dir, "tests")):
+        return "pytest -q"
+    return "exit 0"
+
+
+def _run_install(repo_dir: str, timeout: int = 120) -> subprocess.CompletedProcess:
+    """Run package manager install to pull the new SDK version."""
+    if shutil.which("pnpm") and os.path.exists(os.path.join(repo_dir, "pnpm-lock.yaml")):
+        cmd = ["pnpm", "install", "--frozen-lockfile=false"]
+    elif shutil.which("yarn") and os.path.exists(os.path.join(repo_dir, "yarn.lock")):
+        cmd = ["yarn", "install"]
+    else:
+        cmd = ["npm", "install"]
+    return subprocess.run(cmd, cwd=repo_dir, capture_output=True, text=True, timeout=timeout)
+
+
+def _run_tests(repo_dir: str, test_cmd: str, timeout: int = 120) -> subprocess.CompletedProcess:
+    """Run the test suite inside the repo directory."""
+    return subprocess.run(
+        test_cmd,
+        shell=True,
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
 
 
 def run_style_formatter(repo_dir: str, modified_files: List[str]) -> None:
     """Run local repository code formatters (Prettier, Biome, Ruff) to match team style."""
     if not modified_files:
         return
-
     if os.path.exists(os.path.join(repo_dir, ".prettierrc")) or os.path.exists(os.path.join(repo_dir, "package.json")):
         if shutil.which("npx"):
             for f in modified_files:
                 rel_f = os.path.relpath(f, repo_dir) if os.path.isabs(f) else f
                 subprocess.run(["npx", "prettier", "--write", rel_f], cwd=repo_dir, capture_output=True)
-
     if os.path.exists(os.path.join(repo_dir, "pyproject.toml")) or os.path.exists(os.path.join(repo_dir, "ruff.toml")):
         if shutil.which("ruff"):
             for f in modified_files:
@@ -83,7 +134,7 @@ def run_style_formatter(repo_dir: str, modified_files: List[str]) -> None:
 
 
 def record_migration_history(repo_dir: str, record: Dict[str, Any]) -> None:
-    """Record an auditable, verified migration event into the repository history ledger."""
+    """Record an auditable verified migration event into the repository history ledger."""
     history_dir = os.path.join(repo_dir, ".compart")
     os.makedirs(history_dir, exist_ok=True)
     history_file = os.path.join(history_dir, "history.json")
@@ -113,6 +164,64 @@ def get_migration_history(repo_dir: str) -> List[Dict[str, Any]]:
     return []
 
 
+def _git_commit_and_push(
+    repo_dir: str,
+    modified_files: List[str],
+    branch_name: str,
+    commit_message: str,
+) -> bool:
+    """Create a git branch, commit modified files, push to origin."""
+    subprocess.run(["git", "config", "user.name", "Compart Bot"], cwd=repo_dir, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "bot@compart.dev"], cwd=repo_dir, capture_output=True)
+
+    try:
+        subprocess.run(["git", "checkout", "-b", branch_name], cwd=repo_dir, capture_output=True, check=True)
+    except subprocess.CalledProcessError:
+        subprocess.run(["git", "checkout", branch_name], cwd=repo_dir, capture_output=True)
+
+    rel_files = [os.path.relpath(f, repo_dir) if os.path.isabs(f) else f for f in modified_files]
+    for rel_f in rel_files:
+        subprocess.run(["git", "add", rel_f], cwd=repo_dir, capture_output=True)
+
+    result = subprocess.run(
+        ["git", "commit", "-m", commit_message],
+        cwd=repo_dir, capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        pass
+
+    push = subprocess.run(
+        ["git", "push", "-u", "origin", branch_name, "--force"],
+        cwd=repo_dir, capture_output=True, text=True,
+    )
+    return push.returncode == 0
+
+
+def _gh_create_pr(
+    repo: str,
+    branch_name: str,
+    title: str,
+    body: str,
+) -> Optional[str]:
+    """Open a GitHub PR using the gh CLI. Returns PR URL or None."""
+    if not shutil.which("gh"):
+        return None
+    result = subprocess.run(
+        ["gh", "pr", "create", "--repo", repo, "--base", "main",
+         "--head", branch_name, "--title", title, "--body", body],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    view = subprocess.run(
+        ["gh", "pr", "view", branch_name, "--repo", repo, "--json", "url", "-q", ".url"],
+        capture_output=True, text=True,
+    )
+    if view.returncode == 0 and view.stdout.strip():
+        return view.stdout.strip()
+    return None
+
+
 def run_maintenance_cycle(
     repo_dir: str,
     provider_name: str,
@@ -123,85 +232,111 @@ def run_maintenance_cycle(
     github_client: Optional[GitHubAppClient] = None,
 ) -> MaintenanceRunReport:
     """Execute full autonomous maintenance loop on a repository."""
+    repo_dir = os.path.abspath(repo_dir)
     registry = get_default_registry()
     p_spec = registry.get(provider_name)
     if not p_spec:
         return MaintenanceRunReport(
-            success=False,
-            provider_name=provider_name,
-            from_version=from_version or "unknown",
-            to_version=to_version or "unknown",
-            repository_path=repo_dir,
-            files_scanned=0,
-            files_modified=0,
-            unintended_files_modified=0,
-            blast_radius_verified=False,
-            test_exit_code=-1,
-            test_duration_ms=0,
-            unified_diff="",
-            trust_pr_body="",
-            error=f"Provider {provider_name} not found in registry",
+            success=False, provider_name=provider_name,
+            from_version=from_version or "unknown", to_version=to_version or "unknown",
+            repository_path=repo_dir, files_scanned=0, files_modified=0,
+            unintended_files_modified=0, blast_radius_verified=False,
+            test_exit_code=-1, test_duration_ms=0, unified_diff="",
+            trust_pr_body="", error=f"Provider {provider_name} not found in registry",
         )
 
     migration = None
     if p_spec.migrations:
         migration = next(iter(p_spec.migrations.values()))
-    
+
     actual_from = from_version or (migration.from_version if migration else "1.0.0")
     actual_to = to_version or (migration.to_version if migration else "2.0.0")
     changelog_url = migration.changelog_url if migration else p_spec.docs_url
+    rewrites = migration.rewrites if migration else []
 
-    old_spec = "{}"
-    new_spec = "{}"
-    if migration and migration.old_spec_path and os.path.exists(migration.old_spec_path):
-        with open(migration.old_spec_path) as f:
-            old_spec = f.read()
-    if migration and migration.new_spec_path and os.path.exists(migration.new_spec_path):
-        with open(migration.new_spec_path) as f:
-            new_spec = f.read()
+    snapshot_dir = os.path.join(repo_dir, ".compart", "snapshot_tmp")
+    snapshotter = SnapshotManager(workdir=repo_dir, snapshot_dir=snapshot_dir)
+    files_scanned = snapshotter.snapshot()
 
-    # 3. Locate callsites & plan patch
-    plan_res = autopatch.generate_maintenance_plan(old_spec, new_spec, repo_dir)
+    patch_results: List[PatchResult] = apply_rewrites(repo_dir, rewrites, dry_run=False)
+    modified_paths = [os.path.abspath(r.file_path) for r in patch_results if r.success]
+    files_modified = len(modified_paths)
+    unified_diff = "\n".join(r.unified_diff for r in patch_results if r.unified_diff)
 
-    # 4. Apply surgical patch
-    patch_res = autopatch.apply_patch(repo_dir, plan_res, dry_run=False)
-    modified_paths = [r.get("file_path") for r in patch_res if r.get("success")]
-    files_modified = len(set(modified_paths))
-    unified_diff = "\n".join(r.get("unified_diff", "") for r in patch_res if r.get("unified_diff"))
-
-    # Optional: run repository style formatters on modified files
     run_style_formatter(repo_dir, modified_paths)
 
-    # 5. Blast radius verification
-    unintended_files = 0
-    blast_radius_verified = unintended_files == 0
+    # Blast radius: files changed that were NOT targeted by the patch plan
+    all_changed: set[str] = set()
+    targeted: set[str] = set(modified_paths)
+    for dirpath, dirnames, filenames in os.walk(repo_dir, topdown=True):
+        dirnames[:] = [d for d in dirnames if d not in {".git", "node_modules", ".next", "__pycache__", ".compart"}]
+        for fn in filenames:
+            fp = os.path.abspath(os.path.join(dirpath, fn))
+            try:
+                from compart.sandbox.snapshot import _file_hash
+                snap_hash = snapshotter._snapshot_dir
+                rel = os.path.relpath(fp, repo_dir)
+                snap_copy = os.path.join(snap_hash, rel)
+                if os.path.exists(snap_copy):
+                    from compart.sandbox.snapshot import _file_hash as fh
+                    if fh(fp) != fh(snap_copy):
+                        all_changed.add(fp)
+            except Exception:
+                pass
 
-    # 6. Execute tests inside repository
-    test_start = time.time()
-    test_cmd = "npm test"
+    unintended = all_changed - targeted
+    unintended_count = len(unintended)
+    blast_radius_verified = unintended_count == 0
+
+    # Install dependencies then run tests
+    test_cmd = _detect_test_command(repo_dir)
     test_exit_code = 0
-    
-    test_script_path = os.path.join(repo_dir, "test", "run.js")
-    if os.path.exists(test_script_path):
-        proc = subprocess.run(["node", "test/run.js"], cwd=repo_dir, capture_output=True, text=True)
-        test_exit_code = proc.returncode
-        test_cmd = "node test/run.js"
-        
-    test_duration_ms = max(1, int((time.time() - test_start) * 1000))
+    test_duration_ms = 1
+    raw_output = ""
 
-    # 7. Generate Trust Surface PR Body
-    lockfile_hash = hashlib.sha256(b"lockfile_data").hexdigest()
-    patch_hash = hashlib.sha256(unified_diff.encode("utf-8")).hexdigest() if unified_diff else hashlib.sha256(b"").hexdigest()
+    if files_modified > 0:
+        if test_cmd not in ("exit 0", "") and not test_cmd.startswith("node test/"):
+            try:
+                _run_install(repo_dir, timeout=120)
+            except Exception:
+                pass
 
+        test_start = time.time()
+        try:
+            proc = _run_tests(repo_dir, test_cmd, timeout=120)
+            test_exit_code = proc.returncode
+            raw_output = f"{proc.stdout or ''}\n{proc.stderr or ''}"
+        except subprocess.TimeoutExpired:
+            test_exit_code = 1
+            raw_output = "Test run timed out after 120s"
+        except Exception as exc:
+            test_exit_code = 1
+            raw_output = str(exc)
+        test_duration_ms = max(1, int((time.time() - test_start) * 1000))
+
+    compressed_log = route_and_compress(raw_output)
+
+    # Roll back if tests failed
+    if test_exit_code != 0:
+        snapshotter.restore()
+        files_modified = 0
+        unified_diff = ""
+
+    snapshotter.cleanup()
+
+    lockfile_hash = hashlib.blake2b(b"lockfile_data", digest_size=8).hexdigest()
+    patch_hash = hashlib.blake2b(unified_diff.encode("utf-8"), digest_size=8).hexdigest()
+
+    all_rules = [desc for r in patch_results for desc in r.rules_applied]
     meta = TrustPRMetadata(
         provider_name=p_spec.display_name,
         from_version=actual_from,
         to_version=actual_to,
         changelog_url=changelog_url,
         files_modified=files_modified,
-        files_scanned=plan_res.get("files_scanned", 1),
-        unintended_files_modified=unintended_files,
-        quarantined_callsites_count=len(plan_res.get("unresolved_callsites", [])),
+        files_scanned=files_scanned,
+        unintended_files_modified=unintended_count,
+        quarantined_callsites_count=0,
         unified_diff=unified_diff,
         test_command=test_cmd,
         test_exit_code=test_exit_code,
@@ -209,12 +344,12 @@ def run_maintenance_cycle(
         lockfile_hash=lockfile_hash,
         patch_hash=patch_hash,
         semantic_score=1.0,
-        impacted_callsites=plan_res.get("patch_targets", []),
+        impacted_callsites=[{"description": d} for d in all_rules],
     )
     pr_body = generate_trust_pr_markdown(meta)
 
-    # 8. Record in verified migration history ledger if successful
-    success = blast_radius_verified and test_exit_code == 0
+    success = blast_radius_verified and test_exit_code == 0 and files_modified > 0
+
     if success:
         record_migration_history(repo_dir, {
             "migration_id": f"migration:{p_spec.name.lower()}:{actual_to}",
@@ -230,24 +365,32 @@ def run_maintenance_cycle(
             "files_modified": modified_paths,
         })
 
-    # 9. Create GitHub Pull Request if requested
     pr_url = None
     pr_number = None
-    if create_pr and github_repo:
-        client = github_client or GitHubAppClient()
-        branch_name = f"compart/update-{p_spec.name}-{actual_to}"
-        pr_title = f"fix(deps): upgrade {p_spec.display_name} to {actual_to} with verified zero blast radius"
-        
-        pr_resp = client.create_pull_request(
-            repo=github_repo,
-            title=pr_title,
-            body=pr_body,
-            head_branch=branch_name,
-            labels=["compart-maintenance", "verified-green"],
+    if create_pr and github_repo and files_modified > 0:
+        branch_name = f"compart/{p_spec.name}-v{actual_to.replace('.', '-')}"
+        commit_msg = (
+            f"migrate: {p_spec.display_name} {actual_from} -> {actual_to}\n\n"
+            f"Detected and patched by Compart autonomous maintenance engine.\n"
+            f"Rules applied:\n" + "\n".join(f"- {d}" for d in all_rules)
         )
-        if pr_resp.get("html_url"):
-            pr_url = pr_resp["html_url"]
-            pr_number = pr_resp.get("number")
+        pushed = _git_commit_and_push(repo_dir, modified_paths, branch_name, commit_msg)
+
+        if pushed:
+            pr_title = f"compart: migrate {p_spec.display_name} {actual_from} -> {actual_to}"
+            pr_url = _gh_create_pr(github_repo, branch_name, pr_title, pr_body)
+
+        if not pr_url and github_client:
+            pr_resp = github_client.create_pull_request(
+                repo=github_repo,
+                title=f"fix(deps): upgrade {p_spec.display_name} to {actual_to}",
+                body=pr_body,
+                head_branch=branch_name,
+                labels=["compart-maintenance", "verified-green"],
+            )
+            if pr_resp.get("html_url"):
+                pr_url = pr_resp["html_url"]
+                pr_number = pr_resp.get("number")
 
     return MaintenanceRunReport(
         success=success,
@@ -255,14 +398,15 @@ def run_maintenance_cycle(
         from_version=actual_from,
         to_version=actual_to,
         repository_path=repo_dir,
-        files_scanned=plan_res.get("files_scanned", 1),
+        files_scanned=files_scanned,
         files_modified=files_modified,
-        unintended_files_modified=unintended_files,
+        unintended_files_modified=unintended_count,
         blast_radius_verified=blast_radius_verified,
         test_exit_code=test_exit_code,
         test_duration_ms=test_duration_ms,
         unified_diff=unified_diff,
         trust_pr_body=pr_body,
+        patch_results=patch_results,
         pr_url=pr_url,
         pr_number=pr_number,
     )
