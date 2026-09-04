@@ -21,6 +21,7 @@ class TrustPRMetadata:
     lockfile_hash: str
     patch_hash: str
     semantic_score: float
+    drift_reason: str = ""
     impacted_callsites: List[Dict[str, Any]] = field(default_factory=list)
     unaffected_callsites: List[Dict[str, Any]] = field(default_factory=list)
     quarantined_callsites: List[Dict[str, Any]] = field(default_factory=list)
@@ -31,6 +32,7 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
     is_real_test = bool(meta.test_command and meta.test_command.strip() not in ("exit 0", "none", ""))
     tests_passed = is_real_test and (meta.test_exit_code == 0)
     patched_count = len(meta.impacted_callsites) or meta.files_modified
+    change_clause = f"changed {meta.drift_reason}" if meta.drift_reason else "contract drift"
 
     if is_real_test and tests_passed and meta.unintended_files_modified == 0:
         status_tag = "[VERIFIED]"
@@ -97,10 +99,21 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
         desc = c.get("description") or c.get("matched_code") or "API contract update"
         callsite_lines.append(f"  - {loc}: {desc}")
 
+    warning_lines = []
+    if not is_real_test:
+        warning_lines = [
+            "> [!WARNING]",
+            "> **UNVERIFIED PATCH**: This patch was applied by contract specification but has **not been verified by an automated test suite**. Automated merge is blocked.",
+            "",
+        ]
+
     lines = [
         f"## {status_tag} Autonomous Maintenance: Upgrade `{meta.provider_name}` ({meta.from_version} -> {meta.to_version})",
         "",
-        f"**{meta.provider_name} {meta.from_version} -> {meta.to_version} contract drift -> Compart found {patched_count} affected callsite(s) -> patched those {patched_count} -> {test_summary} -> 0 unrelated files -> {status_tag}**",
+    ]
+    lines.extend(warning_lines)
+    lines.extend([
+        f"**{meta.provider_name} {meta.from_version} -> {meta.to_version} {change_clause} -> Compart found {patched_count} affected callsite(s) -> patched those {patched_count} -> {test_summary} -> 0 unrelated files -> {status_tag}**",
         "",
         "### Upstream API Drift Summary",
         f"- **Provider**: **{meta.provider_name}**",
@@ -115,13 +128,19 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
         f"- **Files Scanned**: `{meta.files_scanned}`",
         f"- **Files Modified**: `{meta.files_modified}`",
         f"- **Unintended Files Touched**: **`{meta.unintended_files_modified}`** (100% Contained)",
+        "",
+        "<details>",
+        "<summary>Cryptographic Integrity Receipts</summary>",
+        "",
         f"- **Lockfile Digest (BLAKE3)**: `{meta.lockfile_hash[:16]}...`",
         f"- **Patch Digest (BLAKE3)**: `{meta.patch_hash[:16]}...`",
+        "",
+        "</details>",
         "",
         "---",
         "",
         "### Verification Evidence",
-    ]
+    ])
     lines.extend(test_lines)
     lines.extend([
         "",

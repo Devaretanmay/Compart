@@ -704,6 +704,7 @@ def generate_evidence(
         lockfile_hash=lockfile_hash,
         patch_hash=patch_hash,
         semantic_score=1.0,
+        drift_reason=analysis.findings[0].breaking_change if analysis.findings else "",
         impacted_callsites=impacted,
     )
     analysis.trust_pr_body = generate_trust_pr_markdown(meta)
