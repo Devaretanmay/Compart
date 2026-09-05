@@ -50,6 +50,54 @@ class GitHubAppClient:
         self.private_key = private_key or os.environ.get("COMPART_GITHUB_PRIVATE_KEY")
         self.api_base_url = api_base_url.rstrip("/")
 
+    def generate_jwt(self, expiration_seconds: int = 600) -> Optional[str]:
+        """Generate a GitHub App JWT from app_id and private_key."""
+        if not self.app_id or not self.private_key:
+            return None
+        try:
+            import jwt
+            import time
+
+            now = int(time.time())
+            payload = {
+                "iat": now - 60,
+                "exp": now + expiration_seconds,
+                "iss": str(self.app_id),
+            }
+            # Support private key as raw PEM string or path to .pem file
+            key_pem = self.private_key
+            if os.path.isfile(key_pem):
+                with open(key_pem, "r", encoding="utf-8") as f:
+                    key_pem = f.read()
+
+            return jwt.encode(payload, key_pem, algorithm="RS256")
+        except Exception:
+            return None
+
+    def get_installation_access_token(self, installation_id: int) -> Optional[str]:
+        """Exchange GitHub App JWT for a repository installation access token."""
+        app_jwt = self.generate_jwt()
+        if not app_jwt:
+            return None
+
+        url = f"{self.api_base_url}/app/installations/{installation_id}/access_tokens"
+        req = urllib.request.Request(
+            url,
+            data=b"{}",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {app_jwt}",
+                "User-Agent": "Compart-Autonomous-Maintenance/1.0",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+                return body.get("token")
+        except Exception:
+            return None
+
     def _headers(self) -> Dict[str, str]:
         headers = {
             "Accept": "application/vnd.github+json",
@@ -57,6 +105,10 @@ class GitHubAppClient:
         }
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
+        elif self.app_id and self.private_key:
+            app_jwt = self.generate_jwt()
+            if app_jwt:
+                headers["Authorization"] = f"Bearer {app_jwt}"
         return headers
 
     def _request(
