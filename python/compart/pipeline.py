@@ -740,6 +740,10 @@ def surface_result(
                 sha_res = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ctx.workdir, capture_output=True, text=True)
                 commit_sha = sha_res.stdout.strip()
                 committed = True
+                try:
+                    subprocess.run(["git", "push", "origin", "HEAD"], cwd=ctx.workdir, capture_output=True, text=True, timeout=30)
+                except Exception:
+                    pass
         except Exception as e:
             _logger.warning("failed to commit verified patch: %s", e)
 
