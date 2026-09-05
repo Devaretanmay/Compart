@@ -50,6 +50,7 @@ from compart.maintenance import (
     run_style_formatter,
     _detect_test_command,
     _run_tests,
+    _compute_lockfile_hash,
 )
 from compart.patch_writer import apply_rewrites
 from compart.sandbox.snapshot import SnapshotManager
@@ -679,8 +680,8 @@ def generate_evidence(
         return analysis
 
     unified_diff = "\n".join(analysis.unified_diffs)
-    lockfile_hash = hashlib.blake2b(b"lockfile_data", digest_size=8).hexdigest()
-    patch_hash = hashlib.blake2b(unified_diff.encode("utf-8"), digest_size=8).hexdigest()
+    lockfile_hash = _compute_lockfile_hash(ctx.workdir)
+    patch_hash = hashlib.blake2b(unified_diff.encode("utf-8"), digest_size=16).hexdigest()
 
     impacted = []
     for f in analysis.findings:

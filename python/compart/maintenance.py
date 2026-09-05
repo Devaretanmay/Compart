@@ -96,6 +96,29 @@ def _detect_test_command(repo_dir: str) -> str:
     return ""
 
 
+def _compute_lockfile_hash(repo_dir: str) -> str:
+    candidates = (
+        "pnpm-lock.yaml",
+        "package-lock.json",
+        "yarn.lock",
+        "bun.lockb",
+        "Cargo.lock",
+        "poetry.lock",
+        "Pipfile.lock",
+        "package.json",
+        "Cargo.toml",
+    )
+    for c in candidates:
+        fp = os.path.join(repo_dir, c)
+        if os.path.isfile(fp):
+            try:
+                with open(fp, "rb") as f:
+                    return hashlib.blake2b(f.read(), digest_size=16).hexdigest()
+            except Exception:
+                pass
+    return hashlib.blake2b(repo_dir.encode("utf-8"), digest_size=16).hexdigest()
+
+
 def _run_install(repo_dir: str, timeout: int = 120) -> subprocess.CompletedProcess:
     """Run package manager install to pull the new SDK version."""
     if shutil.which("pnpm") and os.path.exists(os.path.join(repo_dir, "pnpm-lock.yaml")):
@@ -371,9 +394,8 @@ def run_maintenance_cycle(
         unified_diff = ""
 
     snapshotter.cleanup()
-
-    lockfile_hash = hashlib.blake2b(b"lockfile_data", digest_size=8).hexdigest()
-    patch_hash = hashlib.blake2b(unified_diff.encode("utf-8"), digest_size=8).hexdigest()
+    lockfile_hash = _compute_lockfile_hash(repo_dir)
+    patch_hash = hashlib.blake2b(unified_diff.encode("utf-8"), digest_size=16).hexdigest()
 
     all_rules = [desc for r in patch_results for desc in r.rules_applied]
     meta = TrustPRMetadata(
