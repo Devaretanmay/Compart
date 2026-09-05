@@ -83,6 +83,12 @@ class ProviderRegistry:
                     description="Replace deprecated subscriptions.del with subscriptions.cancel (removed in v13)",
                 ),
                 RewriteRule(
+                    pattern=r'amount:\s*amount',
+                    replacement='amount: String(amount)',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Convert amount parameter to string for Stripe contract",
+                ),
+                RewriteRule(
                     pattern=r'"stripe":\s*"\^11\.\d+\.\d+"',
                     replacement='"stripe": "^13.0.0"',
                     file_extensions=[".json"],
@@ -175,6 +181,96 @@ class ProviderRegistry:
             docs_url="https://supabase.com/docs/reference/javascript/introduction",
         )
         self.register(supabase_spec)
+
+        clerk_spec = ProviderSpec(
+            name="clerk",
+            display_name="Clerk Next.js SDK",
+            package_name="@clerk/nextjs",
+            docs_url="https://clerk.com/docs/upgrade-guides/v5",
+        )
+        clerk_spec.migrations["4.0.0->5.0.0"] = ProviderMigration(
+            from_version="4.29.0",
+            to_version="5.0.0",
+            changelog_url="https://clerk.com/docs/upgrade-guides/v5",
+            description="Clerk SDK v4 to v5: authMiddleware -> clerkMiddleware.",
+            rewrites=[
+                RewriteRule(
+                    pattern=r'authMiddleware\(',
+                    replacement='clerkMiddleware(',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Replace authMiddleware with clerkMiddleware (v5 API)",
+                ),
+                RewriteRule(
+                    pattern=r'"@clerk/nextjs":\s*"\^4\.\d+\.\d+"',
+                    replacement='"@clerk/nextjs": "^5.0.0"',
+                    file_extensions=[".json"],
+                    description="Bump @clerk/nextjs to ^5.0.0",
+                ),
+            ],
+        )
+        self.register(clerk_spec)
+
+        aws_spec = ProviderSpec(
+            name="aws-sdk",
+            display_name="AWS SDK for JavaScript",
+            package_name="aws-sdk",
+            docs_url="https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/migrating-to-v3.html",
+        )
+        aws_spec.migrations["2.0.0->3.0.0"] = ProviderMigration(
+            from_version="2.1400.0",
+            to_version="3.0.0",
+            changelog_url="https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/migrating-to-v3.html",
+            description="AWS SDK v2 to v3: modular client and remove .promise().",
+            rewrites=[
+                RewriteRule(
+                    pattern=r'require\([\'"]aws-sdk[\'"]\)',
+                    replacement="require('@aws-sdk/client-s3')",
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Migrate monolithic aws-sdk import to modular client (v3 API)",
+                ),
+                RewriteRule(
+                    pattern=r'\.promise\(\)',
+                    replacement='',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Strip deprecated .promise() call on AWS SDK v3 client commands",
+                ),
+                RewriteRule(
+                    pattern=r'"aws-sdk":\s*"\^2\.\d+\.\d+"',
+                    replacement='"@aws-sdk/client-s3": "^3.0.0"',
+                    file_extensions=[".json"],
+                    description="Bump aws-sdk to modular @aws-sdk/client-s3 v3",
+                ),
+            ],
+        )
+        self.register(aws_spec)
+
+        sentry_spec = ProviderSpec(
+            name="sentry",
+            display_name="Sentry Node SDK",
+            package_name="@sentry/node",
+            docs_url="https://docs.sentry.io/platforms/javascript/guides/node/migration/v7-to-v8/",
+        )
+        sentry_spec.migrations["7.0.0->8.0.0"] = ProviderMigration(
+            from_version="7.114.0",
+            to_version="8.0.0",
+            changelog_url="https://docs.sentry.io/platforms/javascript/guides/node/migration/v7-to-v8/",
+            description="Sentry Node v7 to v8: getCurrentHub().getClient() -> getClient().",
+            rewrites=[
+                RewriteRule(
+                    pattern=r'Sentry\.getCurrentHub\(\)\.getClient\(\)',
+                    replacement='Sentry.getClient()',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Replace deprecated getCurrentHub().getClient() with getClient() (v8 API)",
+                ),
+                RewriteRule(
+                    pattern=r'"@sentry/node":\s*"\^7\.\d+\.\d+"',
+                    replacement='"@sentry/node": "^8.0.0"',
+                    file_extensions=[".json"],
+                    description="Bump @sentry/node to ^8.0.0",
+                ),
+            ],
+        )
+        self.register(sentry_spec)
 
 
 _GLOBAL_REGISTRY: Optional[ProviderRegistry] = None
