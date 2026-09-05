@@ -77,30 +77,6 @@ class ProviderRegistry:
             new_spec_path="trials/fixtures/calcom_stripe/specs/stripe_v13.json",
             rewrites=[
                 RewriteRule(
-                    pattern=r'apiVersion:\s*"2022-11-15"',
-                    replacement='apiVersion: "2024-06-20"',
-                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
-                    description="Update Stripe apiVersion to 2024-06-20 (required by v13+)",
-                ),
-                RewriteRule(
-                    pattern=r',\s*typescript:\s*true',
-                    replacement='',
-                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
-                    description="Remove deprecated typescript constructor flag (native in v13)",
-                ),
-                RewriteRule(
-                    pattern=r'constructEvent\(\s*(\w+)\s*,\s*(\w+)\s*,\s*(process\.env\.\w+)\s*\)',
-                    replacement=r'constructEvent(\1, \2 as string, \3 as string)',
-                    file_extensions=[".ts", ".tsx"],
-                    description="Explicit string cast for constructEvent (v13 type tightening)",
-                ),
-                RewriteRule(
-                    pattern=r'new Stripe\(process\.env\.(\w+),',
-                    replacement=r'new Stripe(process.env.\1 as string,',
-                    file_extensions=[".ts", ".tsx"],
-                    description="Add as string cast to Stripe constructor key (v13 type safety)",
-                ),
-                RewriteRule(
                     pattern=r'stripe\.subscriptions\.del\(',
                     replacement='stripe.subscriptions.cancel(',
                     file_extensions=[".ts", ".tsx", ".js", ".jsx"],

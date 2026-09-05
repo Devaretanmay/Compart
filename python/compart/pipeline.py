@@ -191,6 +191,7 @@ class AnalysisResult:
     test_duration_ms: int = 0
     trust_pr_body: str = ""
     commit_sha: Optional[str] = None
+    patched_callsites: List[Dict[str, Any]] = field(default_factory=list)
 
     @property
     def has_findings(self) -> bool:
@@ -599,6 +600,7 @@ def apply_fixes(
     snapshotter.snapshot()
     setattr(ctx, "_snapshotter", snapshotter)
 
+    patched_callsites: List[Dict[str, Any]] = []
     for finding in analysis.findings:
         if not finding.is_auto_repairable:
             continue
@@ -616,14 +618,21 @@ def apply_fixes(
                 modified_files.append(r.file_path)
                 if r.unified_diff:
                     unified_diffs.append(r.unified_diff)
+                rel_p = os.path.relpath(r.file_path, ctx.workdir) if os.path.isabs(r.file_path) else r.file_path
+                for rule_desc in r.rules_applied:
+                    patched_callsites.append({
+                        "file_path": rel_p,
+                        "description": rule_desc,
+                    })
 
     if modified_files:
         run_style_formatter(ctx.workdir, modified_files)
 
     analysis.modified_files = modified_files
     analysis.unified_diffs = unified_diffs
-    analysis.patches_planned = len(modified_files)
-    analysis.auto_fixable_count = len(modified_files)
+    analysis.patched_callsites = patched_callsites
+    analysis.patches_planned = len(patched_callsites) or len(modified_files)
+    analysis.auto_fixable_count = len(patched_callsites) or len(modified_files)
     return analysis
 
 
@@ -684,11 +693,14 @@ def generate_evidence(
     lockfile_hash = _compute_lockfile_hash(ctx.workdir)
     patch_hash = _blake3_digest(unified_diff.encode("utf-8"))
 
-    impacted = []
-    for f in analysis.findings:
-        impacted.extend(f.callsites_in_context)
-    if not impacted:
-        impacted = [{"file_path": mf, "description": "Surgically patched"} for mf in analysis.modified_files]
+    if analysis.patched_callsites:
+        impacted = analysis.patched_callsites
+    else:
+        impacted = []
+        for f in analysis.findings:
+            impacted.extend(f.callsites_in_context)
+        if not impacted:
+            impacted = [{"file_path": mf, "description": "Surgically patched"} for mf in analysis.modified_files]
 
     meta = TrustPRMetadata(
         provider_name=analysis.findings[0].display_name if analysis.findings else "External API",
