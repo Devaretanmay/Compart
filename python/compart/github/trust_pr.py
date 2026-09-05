@@ -1,7 +1,7 @@
 """Developer Trust Surface: High-Confidence PR Markdown Generator."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -25,6 +25,7 @@ class TrustPRMetadata:
     impacted_callsites: List[Dict[str, Any]] = field(default_factory=list)
     unaffected_callsites: List[Dict[str, Any]] = field(default_factory=list)
     quarantined_callsites: List[Dict[str, Any]] = field(default_factory=list)
+    found_callsites_count: Optional[int] = None
 
 
 def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
@@ -32,6 +33,7 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
     is_real_test = bool(meta.test_command and meta.test_command.strip() not in ("exit 0", "none", ""))
     tests_passed = is_real_test and (meta.test_exit_code == 0)
     patched_count = len(meta.impacted_callsites) or meta.files_modified
+    found_count = meta.found_callsites_count if meta.found_callsites_count is not None else patched_count
     change_clause = f"changed {meta.drift_reason}" if meta.drift_reason else "contract drift"
 
     if is_real_test and tests_passed and meta.unintended_files_modified == 0:
@@ -107,13 +109,23 @@ def generate_trust_pr_markdown(meta: TrustPRMetadata) -> str:
             "",
         ]
 
+    summary_sentence = (
+        f"**{meta.provider_name} {meta.from_version} -> {meta.to_version} {change_clause} -> "
+        f"Compart found {found_count} affected callsite(s) -> patched {patched_count} -> "
+        f"{test_summary} -> 0 unrelated files -> {status_tag}**"
+    ) if found_count != patched_count else (
+        f"**{meta.provider_name} {meta.from_version} -> {meta.to_version} {change_clause} -> "
+        f"Compart found {patched_count} affected callsite(s) -> patched those {patched_count} -> "
+        f"{test_summary} -> 0 unrelated files -> {status_tag}**"
+    )
+
     lines = [
         f"## {status_tag} Autonomous Maintenance: Upgrade `{meta.provider_name}` ({meta.from_version} -> {meta.to_version})",
         "",
     ]
     lines.extend(warning_lines)
     lines.extend([
-        f"**{meta.provider_name} {meta.from_version} -> {meta.to_version} {change_clause} -> Compart found {patched_count} affected callsite(s) -> patched those {patched_count} -> {test_summary} -> 0 unrelated files -> {status_tag}**",
+        summary_sentence,
         "",
         "### Upstream API Drift Summary",
         f"- **Provider**: **{meta.provider_name}**",

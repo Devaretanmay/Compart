@@ -720,6 +720,7 @@ def generate_evidence(
         semantic_score=1.0,
         drift_reason=analysis.findings[0].breaking_change if analysis.findings else "",
         impacted_callsites=impacted,
+        found_callsites_count=analysis.callsites_total or len(impacted),
     )
     analysis.trust_pr_body = generate_trust_pr_markdown(meta)
     return analysis
