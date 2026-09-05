@@ -101,6 +101,12 @@ class ProviderRegistry:
                     description="Add as string cast to Stripe constructor key (v13 type safety)",
                 ),
                 RewriteRule(
+                    pattern=r'stripe\.subscriptions\.del\(',
+                    replacement='stripe.subscriptions.cancel(',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Replace deprecated subscriptions.del with subscriptions.cancel (removed in v13)",
+                ),
+                RewriteRule(
                     pattern=r'"stripe":\s*"\^11\.\d+\.\d+"',
                     replacement='"stripe": "^13.0.0"',
                     file_extensions=[".json"],
