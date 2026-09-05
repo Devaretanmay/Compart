@@ -20,6 +20,15 @@ from compart.providers.registry import get_default_registry
 from compart.sandbox.snapshot import SnapshotManager, _file_hash
 
 try:
+    import blake3
+
+    def _blake3_digest(data: bytes) -> str:
+        return blake3.blake3(data).hexdigest()
+except ImportError:
+    def _blake3_digest(data: bytes) -> str:
+        return hashlib.blake2b(data, digest_size=16).hexdigest()
+
+try:
     from compart._core import route_and_compress
 except ImportError:
     def route_and_compress(content: str) -> str:
@@ -113,10 +122,10 @@ def _compute_lockfile_hash(repo_dir: str) -> str:
         if os.path.isfile(fp):
             try:
                 with open(fp, "rb") as f:
-                    return hashlib.blake2b(f.read(), digest_size=16).hexdigest()
+                    return _blake3_digest(f.read())
             except Exception:
                 pass
-    return hashlib.blake2b(repo_dir.encode("utf-8"), digest_size=16).hexdigest()
+    return _blake3_digest(repo_dir.encode("utf-8"))
 
 
 def _run_install(repo_dir: str, timeout: int = 120) -> subprocess.CompletedProcess:
@@ -395,7 +404,7 @@ def run_maintenance_cycle(
 
     snapshotter.cleanup()
     lockfile_hash = _compute_lockfile_hash(repo_dir)
-    patch_hash = hashlib.blake2b(unified_diff.encode("utf-8"), digest_size=16).hexdigest()
+    patch_hash = _blake3_digest(unified_diff.encode("utf-8"))
 
     all_rules = [desc for r in patch_results for desc in r.rules_applied]
     meta = TrustPRMetadata(
