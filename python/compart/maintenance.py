@@ -93,7 +93,7 @@ def _detect_test_command(repo_dir: str) -> str:
             with open(pkg_json_path) as f:
                 data = json.load(f)
             scripts = data.get("scripts", {})
-            for candidate in ("test", "test:unit", "test:ci"):
+            for candidate in ("test", "test:unit", "test:ci", "type-check", "build"):
                 if candidate in scripts:
                     return f"npm run {candidate}" if candidate != "test" else "npm test"
         except Exception:

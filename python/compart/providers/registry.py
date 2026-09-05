@@ -121,6 +121,24 @@ class ProviderRegistry:
             new_spec_path="trials/fixtures/langchainjs_openai/specs/openai_v4.json",
             rewrites=[
                 RewriteRule(
+                    pattern=r'import\s*\{\s*Configuration\s*,\s*OpenAIApi\s*\}\s*from\s*["\']openai["\'];?',
+                    replacement='import OpenAI from "openai";',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Replace Configuration and OpenAIApi named imports with default OpenAI import (v4)",
+                ),
+                RewriteRule(
+                    pattern=r':\s*OpenAIApi\b',
+                    replacement=': OpenAI',
+                    file_extensions=[".ts", ".tsx"],
+                    description="Update OpenAIApi type annotation to OpenAI client (v4)",
+                ),
+                RewriteRule(
+                    pattern=r'new\s+OpenAIApi\(\s*new\s+Configuration\((\{[\s\S]*?\})\)\s*\)',
+                    replacement=r'new OpenAI(\1)',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Simplify nested new OpenAIApi(new Configuration({...})) to new OpenAI({...}) (v4)",
+                ),
+                RewriteRule(
                     pattern=r'createChatCompletion\(',
                     replacement='chat.completions.create(',
                     file_extensions=[".ts", ".tsx", ".js", ".jsx", ".py"],
@@ -131,6 +149,12 @@ class ProviderRegistry:
                     replacement='new OpenAI({',
                     file_extensions=[".ts", ".tsx", ".js", ".jsx"],
                     description="Replace Configuration constructor with OpenAI client (v4)",
+                ),
+                RewriteRule(
+                    pattern=r'completion\.data\.choices',
+                    replacement='completion.choices',
+                    file_extensions=[".ts", ".tsx", ".js", ".jsx"],
+                    description="Remove .data wrapper from OpenAI completion response (v4)",
                 ),
             ],
         )
